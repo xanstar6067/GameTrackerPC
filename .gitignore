@@ -135,3 +135,6 @@ _NCrunch*
 
 # GPT .NET 
 .dotnet_home
+
+# Secret files
+[Jj]sonSecret/
