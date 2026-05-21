@@ -162,6 +162,7 @@ public sealed class LibraryTransferService
             }
             else
             {
+                SetGameId(imported, existing.Id);
                 db.Games.Remove(existing);
                 await db.SaveChangesAsync();
                 db.Games.Add(imported);
@@ -199,9 +200,11 @@ public sealed class LibraryTransferService
         incoming.Title = string.IsNullOrWhiteSpace(incoming.Title) ? "Untitled" : incoming.Title.Trim();
         if (incoming.Statuses.Count == 0)
         {
-            incoming.Statuses.Add(GameStatus.PLANNED);
+            incoming.Statuses.Add(incoming.Status ?? GameStatus.PLANNED);
         }
 
+        incoming.Statuses = incoming.Statuses.Distinct().ToList();
+        incoming.Status = incoming.Statuses.FirstOrDefault();
         incoming.ImageScale = Clamp(incoming.ImageScale <= 0 ? 1 : incoming.ImageScale, 1, 4);
         incoming.ImageOffsetX = Clamp(incoming.ImageOffsetX, -2, 2);
         incoming.ImageOffsetY = Clamp(incoming.ImageOffsetY, -2, 2);
@@ -243,7 +246,7 @@ public sealed class LibraryTransferService
             ImageOffsetX = incoming.ImageOffsetX,
             ImageOffsetY = incoming.ImageOffsetY,
             SourcePageUrl = incoming.SourcePageUrl,
-            CustomNotes = incoming.CustomNotes,
+            CustomNotes = GameNotesSerializer.ToStorageJson(incoming.CustomNotes),
             CreatedAt = incoming.CreatedAt,
             UpdatedAt = incoming.UpdatedAt
         };
@@ -257,12 +260,13 @@ public sealed class LibraryTransferService
         for (var i = 0; i < galleryItems.Count; i++)
         {
             var image = galleryItems[i];
-            var localPath = importImage is null ? null : await importImage(image.ArchiveName, image.LocalPath);
+            var archiveName = FirstNonEmptyFileName(image.LocalPath);
+            var localPath = importImage is null ? null : await importImage(archiveName, image.LocalPath);
             game.ImageGallery.Add(new GameImage
             {
                 GameId = game.Id,
                 LocalPath = localPath,
-                ArchiveName = FirstNonEmptyFileName(image.ArchiveName, image.LocalPath),
+                ArchiveName = archiveName,
                 SourceUrl = image.SourceUrl,
                 SourceType = image.SourceType,
                 SortOrder = i
@@ -270,6 +274,20 @@ public sealed class LibraryTransferService
         }
 
         return game;
+    }
+
+    private static void SetGameId(Game game, string id)
+    {
+        game.Id = id;
+        foreach (var status in game.Statuses)
+        {
+            status.GameId = id;
+        }
+
+        foreach (var image in game.ImageGallery)
+        {
+            image.GameId = id;
+        }
     }
 
     private async Task<ExportBuildResult> BuildExportAsync(bool includeImages)
@@ -288,11 +306,21 @@ public sealed class LibraryTransferService
             CreatedAt = Clock.UnixMillisecondsNow(),
             PcServices = await db.PcServices
                 .OrderBy(service => service.Name)
-                .Select(service => new PcServiceDto { Id = service.StableId, Name = service.Name })
+                .Select(service => new PcServiceDto
+                {
+                    Id = service.StableId,
+                    Name = service.Name,
+                    IsDefault = service.IsBuiltIn
+                })
                 .ToListAsync(),
             ConsoleFamilies = await db.ConsoleFamilies
                 .OrderBy(family => family.Name)
-                .Select(family => new ConsoleFamilyDto { Id = family.StableId, Name = family.Name })
+                .Select(family => new ConsoleFamilyDto
+                {
+                    Id = family.StableId,
+                    Name = family.Name,
+                    IsDefault = family.IsBuiltIn
+                })
                 .ToListAsync(),
             ConsoleModels = await db.ConsoleModels
                 .OrderBy(model => model.Name)
@@ -300,7 +328,8 @@ public sealed class LibraryTransferService
                 {
                     Id = model.StableId,
                     FamilyId = model.FamilyStableId,
-                    Name = model.Name
+                    Name = model.Name,
+                    IsDefault = model.IsBuiltIn
                 })
                 .ToListAsync()
         };
@@ -321,7 +350,7 @@ public sealed class LibraryTransferService
                 PcServiceId = game.PcServiceId,
                 ConsoleFamilyId = game.ConsoleFamilyId,
                 ConsoleModelId = game.ConsoleModelId,
-                ImageLocalPath = includeImages ? Path.GetFileName(game.ImageLocalPath) : null,
+                ImageLocalPath = game.ImageLocalPath,
                 ImageArchiveName = coverArchiveName,
                 ImageSourceUrl = game.ImageSourceUrl,
                 ImageSourceType = game.ImageSourceType,
@@ -329,10 +358,11 @@ public sealed class LibraryTransferService
                 ImageOffsetX = game.ImageOffsetX,
                 ImageOffsetY = game.ImageOffsetY,
                 SourcePageUrl = game.SourcePageUrl,
-                CustomNotes = game.CustomNotes,
+                CustomNotes = GameNotesSerializer.FromStorage(game.CustomNotes),
                 CreatedAt = game.CreatedAt,
                 UpdatedAt = game.UpdatedAt
             };
+            dto.Status = dto.Statuses.FirstOrDefault();
 
             foreach (var image in game.ImageGallery.OrderBy(image => image.SortOrder).Take(20))
             {
@@ -342,8 +372,7 @@ public sealed class LibraryTransferService
 
                 dto.ImageGallery.Add(new GameImageDto
                 {
-                    LocalPath = includeImages ? Path.GetFileName(image.LocalPath) : null,
-                    ArchiveName = archiveName,
+                    LocalPath = includeImages ? archiveName : image.LocalPath,
                     SourceUrl = image.SourceUrl,
                     SourceType = image.SourceType
                 });
@@ -366,12 +395,14 @@ public sealed class LibraryTransferService
                 {
                     StableId = service.Id,
                     Name = string.IsNullOrWhiteSpace(service.Name) ? service.Id : service.Name,
+                    IsBuiltIn = service.IsDefault,
                     CreatedAt = Clock.UnixMillisecondsNow()
                 });
             }
             else
             {
                 existing.Name = string.IsNullOrWhiteSpace(service.Name) ? existing.Name : service.Name;
+                existing.IsBuiltIn = existing.IsBuiltIn || service.IsDefault;
             }
         }
 
@@ -384,12 +415,14 @@ public sealed class LibraryTransferService
                 {
                     StableId = family.Id,
                     Name = string.IsNullOrWhiteSpace(family.Name) ? family.Id : family.Name,
+                    IsBuiltIn = family.IsDefault,
                     CreatedAt = Clock.UnixMillisecondsNow()
                 });
             }
             else
             {
                 existing.Name = string.IsNullOrWhiteSpace(family.Name) ? existing.Name : family.Name;
+                existing.IsBuiltIn = existing.IsBuiltIn || family.IsDefault;
             }
         }
 
@@ -403,6 +436,7 @@ public sealed class LibraryTransferService
                     StableId = model.Id,
                     FamilyStableId = model.FamilyId,
                     Name = string.IsNullOrWhiteSpace(model.Name) ? model.Id : model.Name,
+                    IsBuiltIn = model.IsDefault,
                     CreatedAt = Clock.UnixMillisecondsNow()
                 });
             }
@@ -410,6 +444,7 @@ public sealed class LibraryTransferService
             {
                 existing.FamilyStableId = string.IsNullOrWhiteSpace(model.FamilyId) ? existing.FamilyStableId : model.FamilyId;
                 existing.Name = string.IsNullOrWhiteSpace(model.Name) ? existing.Name : model.Name;
+                existing.IsBuiltIn = existing.IsBuiltIn || model.IsDefault;
             }
         }
     }

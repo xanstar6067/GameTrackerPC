@@ -502,6 +502,8 @@
                                     Click="DisconnectDriveButton_Click" />
                             <Button Content="Upload ZIP backup"
                                     Click="UploadDriveBackupButton_Click" />
+                            <Button Content="Auto export to Drive"
+                                    Click="AutoExportDriveBackupButton_Click" />
                             <Button Content="Refresh list"
                                     Click="RefreshDriveBackupsButton_Click" />
                             <Button Content="Restore selected"

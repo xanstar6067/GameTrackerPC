@@ -1,0 +1,66 @@
+{
+  "format": "gamevault-library",
+  "version": 1,
+  "createdAt": 1710000000000,
+  "pcServices": [
+    {
+      "id": "steam",
+      "name": "Steam",
+      "isDefault": true
+    }
+  ],
+  "consoleFamilies": [
+    {
+      "id": "playstation",
+      "name": "PlayStation",
+      "isDefault": true
+    }
+  ],
+  "consoleModels": [
+    {
+      "id": "ps5",
+      "familyId": "playstation",
+      "name": "PlayStation 5",
+      "isDefault": true
+    }
+  ],
+  "themes": {},
+  "games": [
+    {
+      "id": "game-portal-2",
+      "title": "Portal 2",
+      "year": 2011,
+      "status": "COMPLETED",
+      "statuses": [
+        "COMPLETED"
+      ],
+      "platformType": "PC",
+      "pcServiceId": "steam",
+      "consoleFamilyId": null,
+      "consoleModelId": null,
+      "imageLocalPath": "/android/files/images/game_cover.jpg",
+      "imageArchiveName": "game_cover.jpg",
+      "imageSourceUrl": "https://example.test/portal-2-cover.jpg",
+      "imageSourceType": "DIRECT_IMAGE_URL",
+      "imageScale": 1.0,
+      "imageOffsetX": 0.0,
+      "imageOffsetY": 0.0,
+      "imageGallery": [
+        {
+          "localPath": "/android/files/images/game_gallery.jpg",
+          "sourceUrl": "https://example.test/portal-2-gallery.jpg",
+          "sourceType": "DIRECT_IMAGE_URL"
+        }
+      ],
+      "sourcePageUrl": "https://example.test/portal-2",
+      "customNotes": [
+        {
+          "category": "Review",
+          "text": "Co-op finished."
+        }
+      ],
+      "createdAt": 1710000000000,
+      "updatedAt": 1710000000000
+    }
+  ]
+}

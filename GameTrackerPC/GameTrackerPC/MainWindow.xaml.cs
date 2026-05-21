@@ -19,6 +19,9 @@ public partial class MainWindow : Window
     private readonly GoogleDriveBackupService _driveService = new();
     private LibraryTransferService _transferService = null!;
     private string? _currentGameId;
+    private string? _loadedCustomNotesStorage;
+    private string _loadedNotesDisplay = string.Empty;
+    private bool _driveAuthWarningShown;
     private bool _loading;
     private LibraryViewMode _viewMode = LibraryViewMode.List;
 
@@ -46,6 +49,7 @@ public partial class MainWindow : Window
             await LoadGamesAsync();
             NewGame();
             SetStatus("Ready");
+            await TryAutoConnectDriveAsync();
         }
         catch (Exception ex)
         {
@@ -243,7 +247,9 @@ public partial class MainWindow : Window
             ConsoleModelBox.SelectedValue = game.ConsoleModelId;
             CoverUrlBox.Text = game.ImageSourceUrl ?? string.Empty;
             SourcePageUrlBox.Text = game.SourcePageUrl ?? string.Empty;
-            NotesBox.Text = game.CustomNotes ?? string.Empty;
+            _loadedCustomNotesStorage = game.CustomNotes;
+            _loadedNotesDisplay = GameNotesSerializer.ToDisplayText(game.CustomNotes);
+            NotesBox.Text = _loadedNotesDisplay;
             ImageScaleSlider.Value = game.ImageScale;
             ImageOffsetXSlider.Value = game.ImageOffsetX;
             ImageOffsetYSlider.Value = game.ImageOffsetY;
@@ -277,6 +283,8 @@ public partial class MainWindow : Window
             CoverUrlBox.Text = string.Empty;
             SourcePageUrlBox.Text = string.Empty;
             NotesBox.Text = string.Empty;
+            _loadedCustomNotesStorage = null;
+            _loadedNotesDisplay = string.Empty;
             ImageScaleSlider.Value = 1;
             ImageOffsetXSlider.Value = 0;
             ImageOffsetYSlider.Value = 0;
@@ -346,7 +354,9 @@ public partial class MainWindow : Window
         game.ConsoleFamilyId = await ResolveConsoleFamilyIdAsync(db, game.ConsoleModelId);
         game.ImageSourceUrl = string.IsNullOrWhiteSpace(CoverUrlBox.Text) ? game.ImageSourceUrl : CoverUrlBox.Text.Trim();
         game.SourcePageUrl = EmptyToNull(SourcePageUrlBox.Text);
-        game.CustomNotes = EmptyToNull(NotesBox.Text);
+        game.CustomNotes = string.Equals(NotesBox.Text, _loadedNotesDisplay, StringComparison.Ordinal)
+            ? _loadedCustomNotesStorage
+            : GameNotesSerializer.ToStorageFromPlainText(NotesBox.Text);
         game.ImageScale = Clamp(ImageScaleSlider.Value, 1, 4);
         game.ImageOffsetX = Clamp(ImageOffsetXSlider.Value, -2, 2);
         game.ImageOffsetY = Clamp(ImageOffsetYSlider.Value, -2, 2);
@@ -362,6 +372,8 @@ public partial class MainWindow : Window
 
         await db.SaveChangesAsync();
         _currentGameId = id;
+        _loadedCustomNotesStorage = game.CustomNotes;
+        _loadedNotesDisplay = GameNotesSerializer.ToDisplayText(game.CustomNotes);
         return id;
     }
 
@@ -762,6 +774,7 @@ public partial class MainWindow : Window
         {
             SetStatus("Opening browser sign-in...");
             await _driveService.ConnectAsync();
+            _driveAuthWarningShown = false;
             await RefreshDriveBackupsAsync();
             SetStatus("Google Drive connected.");
         });
@@ -785,6 +798,11 @@ public partial class MainWindow : Window
     {
         await RunUiActionAsync("Unable to upload backup.", async () =>
         {
+            if (!await EnsureDriveConnectedAsync())
+            {
+                return;
+            }
+
             var path = BuildLocalBackupPath("zip");
             await _transferService.ExportZipAsync(path);
             await _driveService.UploadZipBackupAsync(path);
@@ -793,9 +811,45 @@ public partial class MainWindow : Window
         });
     }
 
+    private async void AutoExportDriveBackupButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiActionAsync("Unable to auto export to Google Drive.", async () =>
+        {
+            if (!await EnsureDriveConnectedAsync())
+            {
+                return;
+            }
+
+            var tempDirectory = Path.Combine(Path.GetTempPath(), "GameVault");
+            Directory.CreateDirectory(tempDirectory);
+            var tempPath = Path.Combine(tempDirectory, $"gamevault-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+
+            try
+            {
+                await _transferService.ExportZipAsync(tempPath);
+                await _driveService.UploadZipBackupAsync(tempPath);
+                await RefreshDriveBackupsAsync();
+                SetStatus("Temporary ZIP archive exported and uploaded to root /GameVault.");
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+            }
+        });
+    }
+
     private async void RefreshDriveBackupsButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to refresh backups.", RefreshDriveBackupsAsync);
+        await RunUiActionAsync("Unable to refresh backups.", async () =>
+        {
+            if (await EnsureDriveConnectedAsync())
+            {
+                await RefreshDriveBackupsAsync();
+            }
+        });
     }
 
     private async Task RefreshDriveBackupsAsync()
@@ -819,6 +873,11 @@ public partial class MainWindow : Window
     {
         await RunUiActionAsync("Unable to restore latest backup.", async () =>
         {
+            if (!await EnsureDriveConnectedAsync())
+            {
+                return;
+            }
+
             var backups = (await _driveService.ListBackupsAsync()).ToList();
             if (backups.Count == 0)
             {
@@ -831,7 +890,13 @@ public partial class MainWindow : Window
 
     private async Task RestoreDriveBackupAsync(DriveBackupFile backup)
     {
-        await RunUiActionAsync("Unable to restore backup.", () => RestoreDriveBackupCoreAsync(backup));
+        await RunUiActionAsync("Unable to restore backup.", async () =>
+        {
+            if (await EnsureDriveConnectedAsync())
+            {
+                await RestoreDriveBackupCoreAsync(backup);
+            }
+        });
     }
 
     private async Task RestoreDriveBackupCoreAsync(DriveBackupFile backup)
@@ -858,10 +923,62 @@ public partial class MainWindow : Window
 
         await RunUiActionAsync("Unable to move backup to trash.", async () =>
         {
+            if (!await EnsureDriveConnectedAsync())
+            {
+                return;
+            }
+
             await _driveService.TrashBackupAsync(backup.Id);
             await RefreshDriveBackupsAsync();
             SetStatus("Backup moved to Google Drive trash.");
         });
+    }
+
+    private async Task TryAutoConnectDriveAsync()
+    {
+        if (await _driveService.TryConnectWithStoredTokenAsync())
+        {
+            await RefreshDriveBackupsAsync();
+            SetStatus("Google Drive connected automatically.");
+            return;
+        }
+
+        ShowDriveAuthWarningOnce(
+            _driveService.HasStoredToken
+                ? "Google Drive token is missing, expired, or no longer valid. Use Connect account to sign in again."
+                : "Google Drive is not authenticated yet. Use Connect account once, then future starts will connect automatically.");
+    }
+
+    private async Task<bool> EnsureDriveConnectedAsync()
+    {
+        if (_driveService.IsConnected)
+        {
+            return true;
+        }
+
+        if (await _driveService.TryConnectWithStoredTokenAsync())
+        {
+            return true;
+        }
+
+        ShowDriveAuthWarningOnce(
+            _driveService.HasStoredToken
+                ? "Google Drive token is missing, expired, or no longer valid. Use Connect account to sign in again."
+                : "Google Drive is not authenticated yet. Use Connect account once before using Drive actions.");
+        return false;
+    }
+
+    private void ShowDriveAuthWarningOnce(string message)
+    {
+        if (_driveAuthWarningShown)
+        {
+            SetStatus(message);
+            return;
+        }
+
+        _driveAuthWarningShown = true;
+        SetStatus(message);
+        MessageBox.Show(this, message, "Google Drive", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private async void ListModeButton_Click(object sender, RoutedEventArgs e)

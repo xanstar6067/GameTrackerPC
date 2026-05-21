@@ -1,4 +1,5 @@
 using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Google.Apis.Upload;
@@ -45,6 +46,9 @@ public sealed class GoogleDriveBackupService
 
     public bool IsConnected => _driveService is not null;
 
+    public bool HasStoredToken => Directory.Exists(AppPaths.GoogleTokenDirectory) &&
+        Directory.EnumerateFiles(AppPaths.GoogleTokenDirectory, "*", SearchOption.AllDirectories).Any();
+
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         var secretPath = AppPaths.FindGoogleClientSecret()
@@ -66,6 +70,64 @@ public sealed class GoogleDriveBackupService
         });
 
         _folderId = await EnsureFolderAsync(cancellationToken);
+    }
+
+    public async Task<bool> TryConnectWithStoredTokenAsync(CancellationToken cancellationToken = default)
+    {
+        if (_driveService is not null)
+        {
+            return true;
+        }
+
+        if (!HasStoredToken)
+        {
+            return false;
+        }
+
+        try
+        {
+            var secretPath = AppPaths.FindGoogleClientSecret()
+                ?? throw new FileNotFoundException("Google OAuth desktop client JSON was not found in JsonSecret.");
+
+            await using var stream = File.OpenRead(secretPath);
+            var secrets = GoogleClientSecrets.FromStream(stream).Secrets;
+            var dataStore = new FileDataStore(AppPaths.GoogleTokenDirectory, fullPath: true);
+            var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
+            {
+                ClientSecrets = secrets,
+                Scopes = [DriveService.Scope.DriveFile],
+                DataStore = dataStore
+            });
+
+            var token = await flow.LoadTokenAsync("user", cancellationToken);
+            if (token is null)
+            {
+                return false;
+            }
+
+            var credential = new UserCredential(flow, "user", token);
+            if (credential.Token.IsStale &&
+                !await credential.RefreshTokenAsync(cancellationToken))
+            {
+                return false;
+            }
+
+            _driveService = new DriveService(new BaseClientService.Initializer
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = "GameVault Desktop"
+            });
+
+            _folderId = await EnsureFolderAsync(cancellationToken);
+            return true;
+        }
+        catch
+        {
+            _driveService?.Dispose();
+            _driveService = null;
+            _folderId = null;
+            return false;
+        }
     }
 
     public void Disconnect()
