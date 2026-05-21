@@ -15,7 +15,7 @@ public sealed class ImageService
         ".gif"
     };
 
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient = CreateHttpClient();
 
     public string CopyLocalImage(string sourcePath)
     {
@@ -83,5 +83,15 @@ public sealed class ImageService
         return string.IsNullOrWhiteSpace(extension) || !SupportedExtensions.Contains(extension)
             ? ".jpg"
             : extension.ToLowerInvariant();
+    }
+
+    private static HttpClient CreateHttpClient()
+    {
+        var client = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(20)
+        };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("GameVault/1.0");
+        return client;
     }
 }

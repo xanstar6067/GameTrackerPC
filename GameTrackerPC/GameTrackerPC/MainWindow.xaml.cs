@@ -16,6 +16,7 @@ public partial class MainWindow : Window
 {
     private readonly ObservableCollection<GameListItem> _gameItems = [];
     private readonly ImageService _imageService = new();
+    private readonly AutoAddGameService _autoAddService = new();
     private readonly GoogleDriveBackupService _driveService = new();
     private LibraryTransferService _transferService = null!;
     private string? _currentGameId;
@@ -74,6 +75,8 @@ public partial class MainWindow : Window
         SortBox.SelectedIndex = 0;
         PlatformBox.ItemsSource = Enum.GetValues<PlatformType>();
         PlatformBox.SelectedItem = PlatformType.PC;
+        AutoAddSourceBox.ItemsSource = _autoAddService.SupportedSources;
+        AutoAddSourceBox.SelectedItem = AutoAddSource.Steam;
         ImageScaleSlider.Value = 1;
     }
 
@@ -309,6 +312,39 @@ public partial class MainWindow : Window
         });
     }
 
+    private async void AutoAddButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiActionAsync("Unable to import game from store.", async () =>
+        {
+            if (AutoAddSourceBox.SelectedItem is not AutoAddSource source)
+            {
+                throw new InvalidOperationException("Choose a store first.");
+            }
+
+            var reference = AutoAddReferenceBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                throw new InvalidOperationException("Store link, slug, or AppID is required.");
+            }
+
+            SetStatus($"Importing from {AutoAddSourceName(source)}...");
+            var details = await _autoAddService.FetchGameDetailsAsync(new AutoAddRequest(source, reference));
+            var result = await SaveImportedGameAsync(details);
+
+            await LoadReferencesAsync();
+            await LoadGamesAsync(result.GameId);
+            if (!string.IsNullOrWhiteSpace(result.GameId))
+            {
+                await LoadGameIntoEditorAsync(result.GameId);
+            }
+
+            AutoAddReferenceBox.Text = string.Empty;
+            SetStatus(result.ImportedCount > 0
+                ? $"Imported {result.Title} from {AutoAddSourceName(source)}."
+                : $"Game already exists; updated imported images for {result.Title}.");
+        });
+    }
+
     private async Task<string> SaveCurrentGameAsync()
     {
         var title = TitleBox.Text.Trim();
@@ -376,6 +412,194 @@ public partial class MainWindow : Window
         _loadedNotesDisplay = GameNotesSerializer.ToDisplayText(game.CustomNotes);
         return id;
     }
+
+    private async Task<AutoAddResult> SaveImportedGameAsync(AutoAddGameDetails details)
+    {
+        var imageUrls = details.ImageUrls
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        await using var db = CreateDb();
+        await EnsurePcServiceAsync(db, details.PcServiceId, AutoAddSourceName(details.Source));
+
+        var existingGame = await FindExistingImportedGameAsync(db, details);
+        if (existingGame is not null)
+        {
+            var changed = false;
+            if (string.IsNullOrWhiteSpace(existingGame.SourcePageUrl))
+            {
+                existingGame.SourcePageUrl = details.SourcePageUrl;
+                changed = true;
+            }
+
+            changed |= await AddImportedImagesToExistingGameAsync(existingGame, imageUrls);
+            if (changed)
+            {
+                existingGame.UpdatedAt = Clock.UnixMillisecondsNow();
+            }
+
+            await db.SaveChangesAsync();
+            return new AutoAddResult(details.Source, 0, existingGame.Id, existingGame.Title);
+        }
+
+        var storedImages = await DownloadAutoImagesAsync(imageUrls, MaxAutoGalleryImages);
+        var firstStoredImage = storedImages.FirstOrDefault();
+        var primaryImageUrl = firstStoredImage?.SourceUrl ?? imageUrls.FirstOrDefault();
+        var now = Clock.UnixMillisecondsNow();
+        var game = new Game
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = details.Title,
+            Year = details.Year,
+            PlatformType = PlatformType.PC,
+            PcServiceId = details.PcServiceId,
+            ImageLocalPath = firstStoredImage?.LocalPath,
+            ImageArchiveName = firstStoredImage?.ArchiveName,
+            ImageSourceUrl = primaryImageUrl,
+            ImageSourceType = firstStoredImage is not null
+                ? ImageSourceType.AUTO_PARSED
+                : primaryImageUrl is not null
+                    ? ImageSourceType.AUTO_PARSED
+                    : ImageSourceType.NONE,
+            SourcePageUrl = details.SourcePageUrl,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        game.Statuses.Add(new GameStatusEntry { GameId = game.Id, Status = GameStatus.PLANNED });
+
+        for (var index = 0; index < storedImages.Count; index++)
+        {
+            var image = storedImages[index];
+            game.ImageGallery.Add(new GameImage
+            {
+                GameId = game.Id,
+                LocalPath = image.LocalPath,
+                ArchiveName = image.ArchiveName,
+                SourceUrl = image.SourceUrl,
+                SourceType = ImageSourceType.AUTO_PARSED,
+                SortOrder = index
+            });
+        }
+
+        db.Games.Add(game);
+        await db.SaveChangesAsync();
+        return new AutoAddResult(details.Source, 1, game.Id, game.Title);
+    }
+
+    private static async Task<Game?> FindExistingImportedGameAsync(GameVaultDbContext db, AutoAddGameDetails details)
+    {
+        var candidates = await db.Games
+            .Include(game => game.Statuses)
+            .Include(game => game.ImageGallery)
+            .Where(game => game.SourcePageUrl == details.SourcePageUrl || game.PcServiceId == details.PcServiceId)
+            .ToListAsync();
+
+        return candidates.FirstOrDefault(game =>
+            string.Equals(game.SourcePageUrl, details.SourcePageUrl, StringComparison.OrdinalIgnoreCase) ||
+            (string.Equals(game.PcServiceId, details.PcServiceId, StringComparison.OrdinalIgnoreCase) &&
+             string.Equals(game.Title, details.Title, StringComparison.CurrentCultureIgnoreCase)));
+    }
+
+    private async Task<bool> AddImportedImagesToExistingGameAsync(Game game, IReadOnlyList<string> imageUrls)
+    {
+        var existingSourceUrls = game.ImageGallery
+            .Select(image => image.SourceUrl)
+            .Append(game.ImageSourceUrl)
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var availableSlots = MaxAutoGalleryImages - game.ImageGallery.Count;
+        if (availableSlots <= 0)
+        {
+            return false;
+        }
+
+        var urlsToImport = imageUrls
+            .Where(url => !existingSourceUrls.Contains(url))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(availableSlots)
+            .ToList();
+        var storedImages = await DownloadAutoImagesAsync(urlsToImport, availableSlots);
+        if (storedImages.Count == 0)
+        {
+            return false;
+        }
+
+        var nextSortOrder = game.ImageGallery.Count == 0
+            ? 0
+            : game.ImageGallery.Max(image => image.SortOrder) + 1;
+        foreach (var image in storedImages)
+        {
+            game.ImageGallery.Add(new GameImage
+            {
+                GameId = game.Id,
+                LocalPath = image.LocalPath,
+                ArchiveName = image.ArchiveName,
+                SourceUrl = image.SourceUrl,
+                SourceType = ImageSourceType.AUTO_PARSED,
+                SortOrder = nextSortOrder++
+            });
+        }
+
+        var firstImage = storedImages[0];
+        var shouldUseAsCover = string.IsNullOrWhiteSpace(game.ImageLocalPath) ||
+            (!IsSteamLibraryCoverUrl(game.ImageSourceUrl) && IsSteamLibraryCoverUrl(firstImage.SourceUrl));
+        if (shouldUseAsCover)
+        {
+            game.ImageLocalPath = firstImage.LocalPath;
+            game.ImageArchiveName = firstImage.ArchiveName;
+            game.ImageSourceUrl = firstImage.SourceUrl;
+            game.ImageSourceType = ImageSourceType.AUTO_PARSED;
+        }
+
+        return true;
+    }
+
+    private async Task<List<AutoImportedImage>> DownloadAutoImagesAsync(IEnumerable<string> urls, int maxCount)
+    {
+        var storedImages = new List<AutoImportedImage>();
+        foreach (var url in urls.Distinct(StringComparer.OrdinalIgnoreCase).Take(maxCount))
+        {
+            try
+            {
+                var localPath = await _imageService.DownloadImageAsync(url);
+                storedImages.Add(new AutoImportedImage(localPath, Path.GetFileName(localPath), url));
+            }
+            catch
+            {
+                // Store image URLs can expire or reject hotlinking; keep importing the rest of the game data.
+            }
+        }
+
+        return storedImages;
+    }
+
+    private static async Task EnsurePcServiceAsync(GameVaultDbContext db, string stableId, string name)
+    {
+        if (await db.PcServices.AnyAsync(service => service.StableId == stableId))
+        {
+            return;
+        }
+
+        db.PcServices.Add(new PcService
+        {
+            StableId = stableId,
+            Name = name,
+            IsBuiltIn = true,
+            CreatedAt = Clock.UnixMillisecondsNow()
+        });
+    }
+
+    private static string AutoAddSourceName(AutoAddSource source) => source switch
+    {
+        AutoAddSource.Steam => "Steam",
+        AutoAddSource.Gog => "GOG",
+        AutoAddSource.Epic => "Epic Games Store",
+        _ => source.ToString()
+    };
+
+    private static bool IsSteamLibraryCoverUrl(string? value) =>
+        value?.Contains("library_600x900", StringComparison.OrdinalIgnoreCase) == true;
 
     private static async Task<string?> ResolveConsoleFamilyIdAsync(GameVaultDbContext db, string? consoleModelId)
     {
@@ -1227,4 +1451,8 @@ public partial class MainWindow : Window
         var slug = string.Join('-', new string(chars).Split('-', StringSplitOptions.RemoveEmptyEntries));
         return string.IsNullOrWhiteSpace(slug) ? Guid.NewGuid().ToString("N") : slug;
     }
+
+    private sealed record AutoImportedImage(string LocalPath, string ArchiveName, string SourceUrl);
+
+    private const int MaxAutoGalleryImages = 20;
 }

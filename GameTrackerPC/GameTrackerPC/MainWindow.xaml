@@ -188,6 +188,27 @@
 
                             <StackPanel Grid.Column="1"
                                         Margin="18,0,0,0">
+                                <GroupBox Header="Store import">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="110" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="AutoAddSourceBox"
+                                                  Grid.Column="0"
+                                                  Margin="0,0,8,0" />
+                                        <TextBox x:Name="AutoAddReferenceBox"
+                                                 Grid.Column="1"
+                                                 Margin="0,0,8,0"
+                                                 ToolTip="Steam AppID, store URL, or GOG/Epic slug" />
+                                        <Button Grid.Column="2"
+                                                Content="Import"
+                                                Margin="0"
+                                                Click="AutoAddButton_Click" />
+                                    </Grid>
+                                </GroupBox>
+
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
