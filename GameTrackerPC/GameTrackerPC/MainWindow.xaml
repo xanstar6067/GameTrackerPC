@@ -1,12 +1,556 @@
-﻿<Window x:Class="GameTrackerPC.MainWindow"
+<Window x:Class="GameTrackerPC.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:GameTrackerPC"
+        xmlns:models="clr-namespace:GameTrackerPC.Models"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="GameVault Desktop"
+        Height="820"
+        Width="1240"
+        MinHeight="680"
+        MinWidth="1100"
+        Loaded="Window_Loaded">
+    <Window.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="BorderBrushSoft" Color="#CBD5E1" />
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="MinHeight" Value="32" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="30" />
+        </Style>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,12" />
+            <Setter Property="Padding" Value="10" />
+        </Style>
+        <DataTemplate x:Key="GameCardTemplate" DataType="{x:Type models:GameListItem}">
+            <Border BorderBrush="{StaticResource BorderBrushSoft}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="8"
+                    Margin="0,0,0,8"
+                    Background="White">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="58" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="48"
+                            Height="64"
+                            Background="#E2E8F0"
+                            CornerRadius="4"
+                            ClipToBounds="True">
+                        <Image Source="{Binding ImagePath}"
+                               Stretch="UniformToFill" />
+                    </Border>
+                    <StackPanel Grid.Column="1"
+                                Margin="10,0,0,0">
+                        <TextBlock Text="{Binding Title}"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Subtitle}"
+                                   Foreground="#475569"
+                                   FontSize="12"
+                                   Margin="0,3,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Statuses}"
+                                   Foreground="#0F766E"
+                                   FontSize="12"
+                                   Margin="0,3,0,0"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding UpdatedText}"
+                                   Foreground="#64748B"
+                                   FontSize="11"
+                                   Margin="0,3,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <ItemsPanelTemplate x:Key="ListPanelTemplate">
+            <VirtualizingStackPanel />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="TilePanelTemplate">
+            <WrapPanel IsItemsHost="True" />
+        </ItemsPanelTemplate>
+    </Window.Resources>
 
+    <Grid Background="#EEF2F7">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="360" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrushSoft}"
+                BorderThickness="0,0,1,0"
+                Padding="14">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Text="GameVault"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,12" />
+                    <TextBox x:Name="SearchBox"
+                             Margin="0,0,0,8"
+                             TextChanged="Filter_Changed"
+                             ToolTip="Search by title" />
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="StatusFilterBox"
+                                  Grid.Column="0"
+                                  Margin="0,0,4,0"
+                                  SelectionChanged="Filter_Changed" />
+                        <ComboBox x:Name="SortBox"
+                                  Grid.Column="1"
+                                  Margin="4,0,0,0"
+                                  SelectionChanged="Filter_Changed" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,0,0,8">
+                        <Button x:Name="ListModeButton"
+                                Content="List"
+                                Click="ListModeButton_Click" />
+                        <Button x:Name="TilesModeButton"
+                                Content="Tiles"
+                                Click="TilesModeButton_Click" />
+                        <Button Content="New"
+                                Click="NewGameButton_Click" />
+                    </StackPanel>
+                </StackPanel>
+
+                <ListBox x:Name="GamesList"
+                         ItemTemplate="{StaticResource GameCardTemplate}"
+                         ItemsPanel="{StaticResource ListPanelTemplate}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         SelectionChanged="GamesList_SelectionChanged"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1"
+              Margin="14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="StatusText"
+                       Grid.Row="0"
+                       Text="Ready"
+                       Foreground="#334155"
+                       Margin="0,0,0,10" />
+
+            <TabControl Grid.Row="1"
+                        Background="White">
+                <TabItem Header="Game card">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <Grid Margin="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="260" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <Border Height="340"
+                                        Background="#E2E8F0"
+                                        BorderBrush="{StaticResource BorderBrushSoft}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        ClipToBounds="True">
+                                    <Image x:Name="CoverPreview"
+                                           Stretch="UniformToFill" />
+                                </Border>
+                                <StackPanel Orientation="Horizontal"
+                                            Margin="0,12,0,0">
+                                    <Button Content="Add cover"
+                                            Click="AddCoverLocalButton_Click" />
+                                    <Button Content="Reload URL"
+                                            Click="ReloadCoverButton_Click" />
+                                </StackPanel>
+                                <TextBox x:Name="CoverUrlBox"
+                                         Margin="0,4,0,8"
+                                         ToolTip="Image URL" />
+                                <Button Content="Download cover URL"
+                                        Click="DownloadCoverButton_Click" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="18,0,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="110" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Title" />
+                                        <TextBox x:Name="TitleBox"
+                                                 Margin="0,4,0,10" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Margin="10,0,0,0">
+                                        <TextBlock Text="Year" />
+                                        <TextBox x:Name="YearBox"
+                                                 Margin="0,4,0,10" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="Stable ID" />
+                                <TextBox x:Name="IdBox"
+                                         IsReadOnly="True"
+                                         Margin="0,4,0,10" />
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Platform" />
+                                        <ComboBox x:Name="PlatformBox"
+                                                  Margin="0,4,8,10"
+                                                  SelectionChanged="PlatformBox_SelectionChanged" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="PC service" />
+                                        <ComboBox x:Name="PcServiceBox"
+                                                  Margin="0,4,8,10"
+                                                  DisplayMemberPath="Name"
+                                                  SelectedValuePath="StableId" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Console model" />
+                                        <ComboBox x:Name="ConsoleModelBox"
+                                                  Margin="0,4,0,10"
+                                                  DisplayMemberPath="Name"
+                                                  SelectedValuePath="StableId" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <GroupBox Header="Statuses">
+                                    <UniformGrid Columns="3">
+                                        <CheckBox x:Name="StatusCompletedBox"
+                                                  Content="COMPLETED" />
+                                        <CheckBox x:Name="StatusInProgressBox"
+                                                  Content="IN_PROGRESS" />
+                                        <CheckBox x:Name="StatusPostponedBox"
+                                                  Content="POSTPONED" />
+                                        <CheckBox x:Name="StatusDroppedBox"
+                                                  Content="DROPPED" />
+                                        <CheckBox x:Name="StatusPlannedBox"
+                                                  Content="PLANNED" />
+                                        <CheckBox x:Name="StatusNeverPlayAgainBox"
+                                                  Content="NEVER_PLAY_AGAIN" />
+                                    </UniformGrid>
+                                </GroupBox>
+
+                                <GroupBox Header="Cover crop">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="70" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Row="0"
+                                                   Grid.Column="0"
+                                                   Text="Scale" />
+                                        <Slider x:Name="ImageScaleSlider"
+                                                Grid.Row="0"
+                                                Grid.Column="1"
+                                                Minimum="1"
+                                                Maximum="4"
+                                                TickFrequency="0.1"
+                                                ValueChanged="CropSlider_ValueChanged" />
+                                        <TextBlock x:Name="ImageScaleText"
+                                                   Grid.Row="0"
+                                                   Grid.Column="2"
+                                                   TextAlignment="Right" />
+                                        <TextBlock Grid.Row="1"
+                                                   Grid.Column="0"
+                                                   Text="Offset X" />
+                                        <Slider x:Name="ImageOffsetXSlider"
+                                                Grid.Row="1"
+                                                Grid.Column="1"
+                                                Minimum="-2"
+                                                Maximum="2"
+                                                TickFrequency="0.1"
+                                                ValueChanged="CropSlider_ValueChanged" />
+                                        <TextBlock x:Name="ImageOffsetXText"
+                                                   Grid.Row="1"
+                                                   Grid.Column="2"
+                                                   TextAlignment="Right" />
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.Column="0"
+                                                   Text="Offset Y" />
+                                        <Slider x:Name="ImageOffsetYSlider"
+                                                Grid.Row="2"
+                                                Grid.Column="1"
+                                                Minimum="-2"
+                                                Maximum="2"
+                                                TickFrequency="0.1"
+                                                ValueChanged="CropSlider_ValueChanged" />
+                                        <TextBlock x:Name="ImageOffsetYText"
+                                                   Grid.Row="2"
+                                                   Grid.Column="2"
+                                                   TextAlignment="Right" />
+                                    </Grid>
+                                </GroupBox>
+
+                                <TextBlock Text="Source page URL" />
+                                <TextBox x:Name="SourcePageUrlBox"
+                                         Margin="0,4,0,10" />
+                                <TextBlock Text="Notes" />
+                                <TextBox x:Name="NotesBox"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         MinHeight="90"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Margin="0,4,0,10" />
+
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Save"
+                                            Click="SaveGameButton_Click" />
+                                    <Button Content="Delete"
+                                            Click="DeleteGameButton_Click" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Images">
+                    <Grid Margin="14">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0"
+                                    Orientation="Horizontal"
+                                    Margin="0,0,0,10">
+                            <Button Content="Add local image"
+                                    Click="AddGalleryLocalButton_Click" />
+                            <TextBox x:Name="GalleryUrlBox"
+                                     Width="360"
+                                     Margin="0,0,8,8"
+                                     ToolTip="Gallery image URL" />
+                            <Button Content="Download URL"
+                                    Click="AddGalleryUrlButton_Click" />
+                            <Button Content="Set as cover"
+                                    Click="SetGalleryCoverButton_Click" />
+                            <Button Content="Remove"
+                                    Click="RemoveGalleryImageButton_Click" />
+                        </StackPanel>
+                        <ListBox x:Name="GalleryList"
+                                 Grid.Row="1"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Width="160"
+                                            Height="220"
+                                            Padding="6"
+                                            Margin="0,0,10,10"
+                                            BorderBrush="{StaticResource BorderBrushSoft}"
+                                            BorderThickness="1"
+                                            CornerRadius="6">
+                                        <StackPanel>
+                                            <Image Source="{Binding LocalPath}"
+                                                   Height="168"
+                                                   Stretch="UniformToFill" />
+                                            <TextBlock Text="{Binding ArchiveName}"
+                                                       FontSize="11"
+                                                       Margin="0,6,0,0"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="References">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="14">
+                            <GroupBox Header="PC services">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Top"
+                                                Orientation="Horizontal">
+                                        <TextBox x:Name="NewPcServiceBox"
+                                                 Width="260"
+                                                 Margin="0,0,8,8" />
+                                        <Button Content="Add service"
+                                                Click="AddPcServiceButton_Click" />
+                                    </StackPanel>
+                                    <ListBox x:Name="PcServicesList"
+                                             DisplayMemberPath="Name"
+                                             MinHeight="120" />
+                                </DockPanel>
+                            </GroupBox>
+                            <GroupBox Header="Console families">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Top"
+                                                Orientation="Horizontal">
+                                        <TextBox x:Name="NewConsoleFamilyBox"
+                                                 Width="260"
+                                                 Margin="0,0,8,8" />
+                                        <Button Content="Add family"
+                                                Click="AddConsoleFamilyButton_Click" />
+                                    </StackPanel>
+                                    <ListBox x:Name="ConsoleFamiliesList"
+                                             DisplayMemberPath="Name"
+                                             MinHeight="120" />
+                                </DockPanel>
+                            </GroupBox>
+                            <GroupBox Header="Console models">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Top"
+                                                Orientation="Horizontal">
+                                        <ComboBox x:Name="NewModelFamilyBox"
+                                                  Width="220"
+                                                  DisplayMemberPath="Name"
+                                                  SelectedValuePath="StableId"
+                                                  Margin="0,0,8,8" />
+                                        <TextBox x:Name="NewConsoleModelBox"
+                                                 Width="260"
+                                                 Margin="0,0,8,8" />
+                                        <Button Content="Add model"
+                                                Click="AddConsoleModelButton_Click" />
+                                    </StackPanel>
+                                    <ListBox x:Name="ConsoleModelsList"
+                                             DisplayMemberPath="Name"
+                                             MinHeight="160" />
+                                </DockPanel>
+                            </GroupBox>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Import / Export">
+                    <StackPanel Margin="14">
+                        <GroupBox Header="Local backup/export folder">
+                            <DockPanel>
+                                <TextBox x:Name="BackupFolderBox"
+                                         DockPanel.Dock="Left"
+                                         MinWidth="520"
+                                         Margin="0,0,8,8" />
+                                <Button Content="Choose folder"
+                                        Click="ChooseBackupFolderButton_Click" />
+                            </DockPanel>
+                        </GroupBox>
+                        <GroupBox Header="Export">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Export JSON"
+                                        Click="ExportJsonButton_Click" />
+                                <Button Content="Export ZIP with images"
+                                        Click="ExportZipButton_Click" />
+                            </StackPanel>
+                        </GroupBox>
+                        <GroupBox Header="Import">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Import JSON"
+                                        Click="ImportJsonButton_Click" />
+                                <Button Content="Import ZIP"
+                                        Click="ImportZipButton_Click" />
+                            </StackPanel>
+                        </GroupBox>
+                        <GroupBox Header="Maintenance">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Clear image cache"
+                                        Click="ClearImageCacheButton_Click" />
+                                <Button Content="Clear library"
+                                        Click="ClearLibraryButton_Click" />
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </TabItem>
+
+                <TabItem Header="Google Drive">
+                    <Grid Margin="14">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0"
+                                    Orientation="Horizontal"
+                                    Margin="0,0,0,10">
+                            <Button Content="Connect account"
+                                    Click="ConnectDriveButton_Click" />
+                            <Button Content="Disconnect"
+                                    Click="DisconnectDriveButton_Click" />
+                            <Button Content="Upload ZIP backup"
+                                    Click="UploadDriveBackupButton_Click" />
+                            <Button Content="Refresh list"
+                                    Click="RefreshDriveBackupsButton_Click" />
+                            <Button Content="Restore selected"
+                                    Click="RestoreSelectedDriveBackupButton_Click" />
+                            <Button Content="Restore latest"
+                                    Click="RestoreLatestDriveBackupButton_Click" />
+                            <Button Content="Move to trash"
+                                    Click="TrashDriveBackupButton_Click" />
+                        </StackPanel>
+                        <DataGrid x:Name="DriveBackupsGrid"
+                                  Grid.Row="1"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name"
+                                                    Binding="{Binding Name}"
+                                                    Width="*" />
+                                <DataGridTextColumn Header="Created"
+                                                    Binding="{Binding CreatedText}"
+                                                    Width="160" />
+                                <DataGridTextColumn Header="Size"
+                                                    Binding="{Binding SizeText}"
+                                                    Width="110" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock Grid.Row="2"
+                                   Text="Only the root /GameVault folder is used."
+                                   Foreground="#64748B"
+                                   Margin="0,10,0,0" />
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Settings">
+                    <StackPanel Margin="14">
+                        <GroupBox Header="Theme">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="LightThemeButton"
+                                             Content="Light"
+                                             Margin="0,0,16,0"
+                                             Checked="ThemeButton_Checked" />
+                                <RadioButton x:Name="DarkThemeButton"
+                                             Content="Dark"
+                                             Checked="ThemeButton_Checked" />
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
+        </Grid>
     </Grid>
 </Window>

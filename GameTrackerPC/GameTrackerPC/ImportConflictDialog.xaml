@@ -1,0 +1,72 @@
+<Window x:Class="GameTrackerPC.ImportConflictDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Import conflict"
+        Width="520"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    <Border Padding="18">
+        <StackPanel>
+            <TextBlock Text="Import conflict"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,10" />
+            <TextBlock x:Name="ConflictText"
+                       TextWrapping="Wrap"
+                       Margin="0,0,0,14" />
+            <Grid Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0"
+                        Padding="10"
+                        Margin="0,0,6,0"
+                        BorderBrush="#D1D5DB"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                    <StackPanel>
+                        <TextBlock Text="Existing"
+                                   FontWeight="SemiBold" />
+                        <TextBlock x:Name="ExistingText"
+                                   TextWrapping="Wrap"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1"
+                        Padding="10"
+                        Margin="6,0,0,0"
+                        BorderBrush="#D1D5DB"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                    <StackPanel>
+                        <TextBlock Text="Incoming"
+                                   FontWeight="SemiBold" />
+                        <TextBlock x:Name="IncomingText"
+                                   TextWrapping="Wrap"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+            <UniformGrid Columns="4">
+                <Button Content="Replace"
+                        Margin="0,0,6,0"
+                        Padding="10,6"
+                        Click="Replace_Click" />
+                <Button Content="Replace all"
+                        Margin="6,0"
+                        Padding="10,6"
+                        Click="ReplaceAll_Click" />
+                <Button Content="Skip"
+                        Margin="6,0"
+                        Padding="10,6"
+                        Click="Skip_Click" />
+                <Button Content="Cancel"
+                        Margin="6,0,0,0"
+                        Padding="10,6"
+                        Click="Cancel_Click" />
+            </UniformGrid>
+        </StackPanel>
+    </Border>
+</Window>
