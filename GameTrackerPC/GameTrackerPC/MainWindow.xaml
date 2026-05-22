@@ -6,73 +6,284 @@
         xmlns:models="clr-namespace:GameTrackerPC.Models"
         mc:Ignorable="d"
         Title="GameVault Desktop"
-        Height="820"
-        Width="1240"
+        Height="840"
+        Width="1280"
         MinHeight="680"
-        MinWidth="1100"
-        Loaded="Window_Loaded">
+        MinWidth="980"
+        Loaded="Window_Loaded"
+        Background="{DynamicResource AppBackgroundBrush}">
     <Window.Resources>
-        <SolidColorBrush x:Key="PanelBrush" Color="#F8FAFC" />
-        <SolidColorBrush x:Key="BorderBrushSoft" Color="#CBD5E1" />
-        <Style TargetType="Button">
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="Margin" Value="0,0,8,8" />
-            <Setter Property="MinHeight" Value="32" />
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#08111F" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#101B2D" />
+        <SolidColorBrush x:Key="SurfaceAltBrush" Color="#17243A" />
+        <SolidColorBrush x:Key="PanelBrush" Color="#0B1424" />
+        <SolidColorBrush x:Key="TextBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#9BA8BC" />
+        <SolidColorBrush x:Key="BorderBrushSoft" Color="#38516E" />
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#38F2C2" />
+        <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#73FFE0" />
+        <SolidColorBrush x:Key="PrimaryPressedBrush" Color="#1BB893" />
+        <SolidColorBrush x:Key="SecondaryBrush" Color="#FFCC33" />
+        <SolidColorBrush x:Key="ButtonTextBrush" Color="#061019" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#FF4D6D" />
+        <SolidColorBrush x:Key="InputBrush" Color="#0E1A2C" />
+        <SolidColorBrush x:Key="InputTextBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="ChipBrush" Color="#163D48" />
+
+        <Style x:Key="CyberButton" TargetType="{x:Type Button}">
+            <Setter Property="Padding" Value="16,9" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, Segoe UI" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Grid SnapsToDevicePixels="True">
+                            <Border x:Name="Chrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" />
+                            <Path Stroke="{TemplateBinding BorderBrush}"
+                                  StrokeThickness="2"
+                                  Data="M 0,14 L 14,0"
+                                  HorizontalAlignment="Right"
+                                  VerticalAlignment="Top"
+                                  Width="14"
+                                  Height="14"
+                                  Stretch="Fill" />
+                            <Path Stroke="{TemplateBinding BorderBrush}"
+                                  StrokeThickness="2"
+                                  Data="M 0,14 L 14,0"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Bottom"
+                                  Width="14"
+                                  Height="14"
+                                  Stretch="Fill" />
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource PrimaryHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource PrimaryPressedBrush}" />
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform X="1" Y="1" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="MinHeight" Value="30" />
+
+        <Style TargetType="{x:Type Button}" BasedOn="{StaticResource CyberButton}" />
+
+        <Style x:Key="SecondaryButton" TargetType="{x:Type Button}" BasedOn="{StaticResource CyberButton}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+        </Style>
+
+        <Style x:Key="DangerButton" TargetType="{x:Type Button}" BasedOn="{StaticResource CyberButton}">
+            <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <Style TargetType="{x:Type TextBox}">
+            <Setter Property="MinHeight" Value="36" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="0,4,0,12" />
+            <Setter Property="Background" Value="{DynamicResource InputBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource InputTextBrush}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TextBox}">
+                        <Grid>
+                            <Border x:Name="Chrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" />
+                            <Path Stroke="{TemplateBinding BorderBrush}"
+                                  StrokeThickness="1.5"
+                                  Data="M 0,12 L 12,0"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Top"
+                                  Width="12"
+                                  Height="12"
+                                  Stretch="Fill" />
+                            <Path Stroke="{TemplateBinding BorderBrush}"
+                                  StrokeThickness="1.5"
+                                  Data="M 0,12 L 12,0"
+                                  HorizontalAlignment="Right"
+                                  VerticalAlignment="Bottom"
+                                  Width="12"
+                                  Height="12"
+                                  Stretch="Fill" />
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsReadOnly" Value="True">
+                                <Setter Property="Opacity" Value="0.72" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
-        <Style TargetType="ComboBox">
-            <Setter Property="MinHeight" Value="30" />
+
+        <Style TargetType="{x:Type ComboBox}">
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Margin" Value="0,4,0,12" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Background" Value="{DynamicResource InputBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource InputTextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
         </Style>
-        <Style TargetType="GroupBox">
-            <Setter Property="Margin" Value="0,0,0,12" />
-            <Setter Property="Padding" Value="10" />
+
+        <Style TargetType="{x:Type CheckBox}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Margin" Value="0,0,12,10" />
+            <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, Segoe UI" />
         </Style>
+
+        <Style TargetType="{x:Type RadioButton}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Margin" Value="0,0,14,8" />
+        </Style>
+
+        <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
+
+        <Style x:Key="MutedText" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style x:Key="SectionTitle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, Segoe UI" />
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+
+        <Style x:Key="LabelText" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, Segoe UI" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+
+        <Style x:Key="CyberPanel" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="18" />
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+
+        <Style x:Key="CyberChip" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,4" />
+        </Style>
+
+        <Style TargetType="{x:Type ListBox}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        </Style>
+
+        <Style TargetType="{x:Type DataGrid}">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource BorderBrushSoft}" />
+            <Setter Property="RowBackground" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="AlternatingRowBackground" Value="{DynamicResource SurfaceAltBrush}" />
+        </Style>
+
         <DataTemplate x:Key="GameCardTemplate" DataType="{x:Type models:GameListItem}">
-            <Border BorderBrush="{StaticResource BorderBrushSoft}"
+            <Border BorderBrush="{DynamicResource BorderBrushSoft}"
                     BorderThickness="1"
-                    CornerRadius="6"
-                    Padding="8"
-                    Margin="0,0,0,8"
-                    Background="White">
+                    Padding="10"
+                    Margin="0,0,0,10"
+                    Background="{DynamicResource SurfaceBrush}">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="58" />
+                        <ColumnDefinition Width="70" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Border Width="48"
-                            Height="64"
-                            Background="#E2E8F0"
-                            CornerRadius="4"
+                    <Border Width="58"
+                            Height="78"
+                            Background="{DynamicResource SurfaceAltBrush}"
+                            BorderBrush="{DynamicResource BorderBrushSoft}"
+                            BorderThickness="1"
                             ClipToBounds="True">
                         <Image Source="{Binding ImagePath}"
                                Stretch="UniformToFill" />
                     </Border>
                     <StackPanel Grid.Column="1"
-                                Margin="10,0,0,0">
+                                Margin="12,0,0,0">
                         <TextBlock Text="{Binding Title}"
-                                   FontWeight="SemiBold"
+                                   FontWeight="Bold"
+                                   FontSize="15"
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding Subtitle}"
-                                   Foreground="#475569"
-                                   FontSize="12"
-                                   Margin="0,3,0,0"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,4,0,0"
                                    TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding Statuses}"
-                                   Foreground="#0F766E"
-                                   FontSize="12"
-                                   Margin="0,3,0,0"
-                                   TextWrapping="Wrap" />
+                        <Border Style="{StaticResource CyberChip}"
+                                HorizontalAlignment="Left"
+                                Margin="0,8,0,0">
+                            <TextBlock Text="{Binding Statuses}"
+                                       Foreground="{DynamicResource PrimaryBrush}"
+                                       FontSize="11"
+                                       FontFamily="Consolas, Cascadia Mono, Segoe UI"
+                                       TextWrapping="Wrap" />
+                        </Border>
                         <TextBlock Text="{Binding UpdatedText}"
-                                   Foreground="#64748B"
+                                   Foreground="{DynamicResource MutedTextBrush}"
                                    FontSize="11"
-                                   Margin="0,3,0,0" />
+                                   Margin="0,8,0,0" />
                     </StackPanel>
                 </Grid>
             </Border>
         </DataTemplate>
+
         <ItemsPanelTemplate x:Key="ListPanelTemplate">
             <VirtualizingStackPanel />
         </ItemsPanelTemplate>
@@ -81,505 +292,910 @@
         </ItemsPanelTemplate>
     </Window.Resources>
 
-    <Grid Background="#EEF2F7">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="360" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+    <Grid x:Name="RootShell">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <Border Grid.Column="0"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrushSoft}"
-                BorderThickness="0,0,1,0"
-                Padding="14">
+        <Border Grid.Row="0"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource BorderBrushSoft}"
+                BorderThickness="0,0,0,1"
+                Padding="16,12">
             <DockPanel LastChildFill="True">
-                <StackPanel DockPanel.Dock="Top">
-                    <TextBlock Text="GameVault"
-                               FontSize="24"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,12" />
-                    <TextBox x:Name="SearchBox"
-                             Margin="0,0,0,8"
-                             TextChanged="Filter_Changed"
-                             ToolTip="Search by title" />
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <ComboBox x:Name="StatusFilterBox"
-                                  Grid.Column="0"
-                                  Margin="0,0,4,0"
-                                  SelectionChanged="Filter_Changed" />
-                        <ComboBox x:Name="SortBox"
-                                  Grid.Column="1"
-                                  Margin="4,0,0,0"
-                                  SelectionChanged="Filter_Changed" />
-                    </Grid>
-                    <StackPanel Orientation="Horizontal"
-                                Margin="0,0,0,8">
-                        <Button x:Name="ListModeButton"
-                                Content="List"
-                                Click="ListModeButton_Click" />
-                        <Button x:Name="TilesModeButton"
-                                Content="Tiles"
-                                Click="TilesModeButton_Click" />
-                        <Button Content="New"
-                                Click="NewGameButton_Click" />
-                    </StackPanel>
+                <StackPanel DockPanel.Dock="Left"
+                            Orientation="Horizontal">
+                    <Button x:Name="BackButton"
+                            Content="Back"
+                            Style="{StaticResource SecondaryButton}"
+                            Click="BackButton_Click" />
+                    <Button x:Name="HomeButton"
+                            Content="Home"
+                            Style="{StaticResource SecondaryButton}"
+                            Click="HomeButton_Click" />
                 </StackPanel>
-
-                <ListBox x:Name="GamesList"
-                         ItemTemplate="{StaticResource GameCardTemplate}"
-                         ItemsPanel="{StaticResource ListPanelTemplate}"
-                         BorderThickness="0"
-                         Background="Transparent"
-                         SelectionChanged="GamesList_SelectionChanged"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                <StackPanel DockPanel.Dock="Right"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right">
+                    <TextBlock x:Name="StatusText"
+                               Text="Ready"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,10,0" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock x:Name="ScreenTitleText"
+                               Text="GAMEVAULT"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               FontFamily="Consolas, Cascadia Mono, Segoe UI" />
+                    <TextBlock x:Name="ScreenSubtitleText"
+                               Text="Desktop library"
+                               Style="{StaticResource MutedText}" />
+                </StackPanel>
             </DockPanel>
         </Border>
 
-        <Grid Grid.Column="1"
-              Margin="14">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <Grid x:Name="ScreensHost"
+              Grid.Row="1"
+              Margin="20">
+            <Grid x:Name="StartScreen">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="420" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center"
+                            Margin="36,0,36,0">
+                    <TextBlock Text="GAMEVAULT"
+                               FontSize="68"
+                               FontWeight="Black"
+                               FontFamily="Consolas, Cascadia Mono, Segoe UI"
+                               Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Text="Desktop collection control"
+                               FontSize="18"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Margin="4,8,0,36" />
+                    <Button Content="Start"
+                            Width="260"
+                            HorizontalAlignment="Left"
+                            Click="StartButton_Click" />
+                </StackPanel>
+                <Border Grid.Column="1"
+                        Style="{StaticResource CyberPanel}"
+                        VerticalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock Text="Theme"
+                                   Style="{StaticResource SectionTitle}" />
+                        <ComboBox x:Name="StartThemeBox"
+                                  DisplayMemberPath="Text"
+                                  SelectedValuePath="Value"
+                                  SelectionChanged="ThemeBox_SelectionChanged" />
+                        <TextBlock Text="Use the same visual modes as the mobile GameVault shell."
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource MutedText}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
 
-            <TextBlock x:Name="StatusText"
-                       Grid.Row="0"
-                       Text="Ready"
-                       Foreground="#334155"
-                       Margin="0,0,0,10" />
+            <Grid x:Name="MenuScreen"
+                  Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <UniformGrid Columns="2"
+                             Rows="2"
+                             MaxWidth="920"
+                             MaxHeight="520"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center">
+                    <Button Content="New record"
+                            Margin="12"
+                            FontSize="24"
+                            Click="NewGameButton_Click" />
+                    <Button Content="Database"
+                            Margin="12"
+                            FontSize="24"
+                            Click="OpenDatabaseButton_Click" />
+                    <Button Content="Settings"
+                            Margin="12"
+                            FontSize="24"
+                            Click="OpenSettingsButton_Click" />
+                    <Button Content="Exit"
+                            Margin="12"
+                            FontSize="24"
+                            Style="{StaticResource SecondaryButton}"
+                            Click="ExitButton_Click" />
+                </UniformGrid>
+            </Grid>
 
-            <TabControl Grid.Row="1"
-                        Background="White">
-                <TabItem Header="Game card">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <Grid Margin="14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="260" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <Border Height="340"
-                                        Background="#E2E8F0"
-                                        BorderBrush="{StaticResource BorderBrushSoft}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        ClipToBounds="True">
-                                    <Image x:Name="CoverPreview"
-                                           Stretch="UniformToFill" />
-                                </Border>
-                                <StackPanel Orientation="Horizontal"
-                                            Margin="0,12,0,0">
-                                    <Button Content="Add cover"
-                                            Click="AddCoverLocalButton_Click" />
-                                    <Button Content="Reload URL"
-                                            Click="ReloadCoverButton_Click" />
-                                </StackPanel>
-                                <TextBox x:Name="CoverUrlBox"
-                                         Margin="0,4,0,8"
-                                         ToolTip="Image URL" />
-                                <Button Content="Download cover URL"
-                                        Click="DownloadCoverButton_Click" />
-                            </StackPanel>
+            <Grid x:Name="DatabaseScreen"
+                  Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Border Style="{StaticResource CyberPanel}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0"
+                                    Margin="0,0,12,0">
+                            <TextBlock Text="Search by title"
+                                       Style="{StaticResource LabelText}" />
+                            <TextBox x:Name="SearchBox"
+                                     TextChanged="Filter_Changed"
+                                     ToolTip="Search by title" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    Margin="0,0,12,0">
+                            <TextBlock Text="Statuses"
+                                       Style="{StaticResource LabelText}" />
+                            <ComboBox x:Name="StatusFilterBox"
+                                      SelectionChanged="Filter_Changed" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2"
+                                    Margin="0,0,12,0">
+                            <TextBlock Text="Sort"
+                                       Style="{StaticResource LabelText}" />
+                            <ComboBox x:Name="SortBox"
+                                      SelectionChanged="Filter_Changed" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="3"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Bottom">
+                            <Button x:Name="ListModeButton"
+                                    Content="List"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Click="ListModeButton_Click" />
+                            <Button x:Name="TilesModeButton"
+                                    Content="Tiles"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Click="TilesModeButton_Click" />
+                            <Button Content="Import / Export"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Click="OpenImportExportButton_Click" />
+                            <Button Content="New"
+                                    Click="NewGameButton_Click" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <ListBox x:Name="GamesList"
+                         Grid.Row="1"
+                         ItemTemplate="{StaticResource GameCardTemplate}"
+                         ItemsPanel="{StaticResource ListPanelTemplate}"
+                         BorderThickness="0"
+                         SelectionChanged="GamesList_SelectionChanged"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+            </Grid>
 
-                            <StackPanel Grid.Column="1"
-                                        Margin="18,0,0,0">
-                                <GroupBox Header="Store import">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="140" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="110" />
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox x:Name="AutoAddSourceBox"
-                                                  Grid.Column="0"
-                                                  Margin="0,0,8,0" />
-                                        <TextBox x:Name="AutoAddReferenceBox"
-                                                 Grid.Column="1"
-                                                 Margin="0,0,8,0"
-                                                 ToolTip="Steam AppID, store URL, or GOG/Epic slug" />
-                                        <Button Grid.Column="2"
-                                                Content="Import"
-                                                Margin="0"
-                                                Click="AutoAddButton_Click" />
-                                    </Grid>
-                                </GroupBox>
+            <Grid x:Name="AddModeScreen"
+                  Visibility="Collapsed">
+                <UniformGrid Columns="2"
+                             MaxWidth="820"
+                             MaxHeight="360"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center">
+                    <Button Content="Manual add"
+                            Margin="12"
+                            FontSize="24"
+                            Click="ManualAddButton_Click" />
+                    <Button Content="Add by link"
+                            Margin="12"
+                            FontSize="24"
+                            Style="{StaticResource SecondaryButton}"
+                            Click="AutoAddModeButton_Click" />
+                </UniformGrid>
+            </Grid>
 
+            <ScrollViewer x:Name="ManualEditScreen"
+                          Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0"
+                                Margin="0,0,18,0">
+                        <Border Height="420"
+                                Background="{DynamicResource SurfaceAltBrush}"
+                                BorderBrush="{DynamicResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                ClipToBounds="True"
+                                Margin="0,0,0,12">
+                            <Image x:Name="CoverPreview"
+                                   Stretch="UniformToFill" />
+                        </Border>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Add cover"
+                                    Click="AddCoverLocalButton_Click" />
+                            <Button Content="Reload URL"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Click="ReloadCoverButton_Click" />
+                        </StackPanel>
+                        <TextBlock Text="Image URL"
+                                   Style="{StaticResource LabelText}" />
+                        <TextBox x:Name="CoverUrlBox"
+                                 ToolTip="Image URL" />
+                        <Button Content="Download cover URL"
+                                Style="{StaticResource SecondaryButton}"
+                                Click="DownloadCoverButton_Click" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1">
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock Text="Main"
+                                           Style="{StaticResource SectionTitle}" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="130" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Title" />
-                                        <TextBox x:Name="TitleBox"
-                                                 Margin="0,4,0,10" />
+                                    <StackPanel Grid.Column="0"
+                                                Margin="0,0,12,0">
+                                        <TextBlock Text="Title"
+                                                   Style="{StaticResource LabelText}" />
+                                        <TextBox x:Name="TitleBox" />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1"
-                                                Margin="10,0,0,0">
-                                        <TextBlock Text="Year" />
-                                        <TextBox x:Name="YearBox"
-                                                 Margin="0,4,0,10" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Year"
+                                                   Style="{StaticResource LabelText}" />
+                                        <TextBox x:Name="YearBox" />
                                     </StackPanel>
                                 </Grid>
-
-                                <TextBlock Text="Stable ID" />
+                                <TextBlock Text="Stable ID"
+                                           Style="{StaticResource LabelText}" />
                                 <TextBox x:Name="IdBox"
-                                         IsReadOnly="True"
-                                         Margin="0,4,0,10" />
+                                         IsReadOnly="True" />
+                            </StackPanel>
+                        </Border>
 
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock Text="Platform / Distribution"
+                                           Style="{StaticResource SectionTitle}" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="160" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Platform" />
+                                    <StackPanel Grid.Column="0"
+                                                Margin="0,0,12,0">
+                                        <TextBlock Text="Platform"
+                                                   Style="{StaticResource LabelText}" />
                                         <ComboBox x:Name="PlatformBox"
-                                                  Margin="0,4,8,10"
                                                   SelectionChanged="PlatformBox_SelectionChanged" />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="PC service" />
+                                    <StackPanel Grid.Column="1"
+                                                Margin="0,0,12,0">
+                                        <TextBlock Text="PC service"
+                                                   Style="{StaticResource LabelText}" />
                                         <ComboBox x:Name="PcServiceBox"
-                                                  Margin="0,4,8,10"
                                                   DisplayMemberPath="Name"
                                                   SelectedValuePath="StableId" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Console model" />
+                                        <TextBlock Text="Console model"
+                                                   Style="{StaticResource LabelText}" />
                                         <ComboBox x:Name="ConsoleModelBox"
-                                                  Margin="0,4,0,10"
                                                   DisplayMemberPath="Name"
                                                   SelectedValuePath="StableId" />
                                     </StackPanel>
                                 </Grid>
+                            </StackPanel>
+                        </Border>
 
-                                <GroupBox Header="Statuses">
-                                    <UniformGrid Columns="3">
-                                        <CheckBox x:Name="StatusCompletedBox"
-                                                  Content="COMPLETED" />
-                                        <CheckBox x:Name="StatusInProgressBox"
-                                                  Content="IN_PROGRESS" />
-                                        <CheckBox x:Name="StatusPostponedBox"
-                                                  Content="POSTPONED" />
-                                        <CheckBox x:Name="StatusDroppedBox"
-                                                  Content="DROPPED" />
-                                        <CheckBox x:Name="StatusPlannedBox"
-                                                  Content="PLANNED" />
-                                        <CheckBox x:Name="StatusNeverPlayAgainBox"
-                                                  Content="NEVER_PLAY_AGAIN" />
-                                    </UniformGrid>
-                                </GroupBox>
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock Text="Statuses"
+                                           Style="{StaticResource SectionTitle}" />
+                                <UniformGrid Columns="3">
+                                    <CheckBox x:Name="StatusCompletedBox"
+                                              Content="COMPLETED" />
+                                    <CheckBox x:Name="StatusInProgressBox"
+                                              Content="IN_PROGRESS" />
+                                    <CheckBox x:Name="StatusPostponedBox"
+                                              Content="POSTPONED" />
+                                    <CheckBox x:Name="StatusDroppedBox"
+                                              Content="DROPPED" />
+                                    <CheckBox x:Name="StatusPlannedBox"
+                                              Content="PLANNED" />
+                                    <CheckBox x:Name="StatusNeverPlayAgainBox"
+                                              Content="NEVER_PLAY_AGAIN" />
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
 
-                                <GroupBox Header="Cover crop">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="80" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="70" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Row="0"
-                                                   Grid.Column="0"
-                                                   Text="Scale" />
-                                        <Slider x:Name="ImageScaleSlider"
-                                                Grid.Row="0"
-                                                Grid.Column="1"
-                                                Minimum="1"
-                                                Maximum="4"
-                                                TickFrequency="0.1"
-                                                ValueChanged="CropSlider_ValueChanged" />
-                                        <TextBlock x:Name="ImageScaleText"
-                                                   Grid.Row="0"
-                                                   Grid.Column="2"
-                                                   TextAlignment="Right" />
-                                        <TextBlock Grid.Row="1"
-                                                   Grid.Column="0"
-                                                   Text="Offset X" />
-                                        <Slider x:Name="ImageOffsetXSlider"
-                                                Grid.Row="1"
-                                                Grid.Column="1"
-                                                Minimum="-2"
-                                                Maximum="2"
-                                                TickFrequency="0.1"
-                                                ValueChanged="CropSlider_ValueChanged" />
-                                        <TextBlock x:Name="ImageOffsetXText"
-                                                   Grid.Row="1"
-                                                   Grid.Column="2"
-                                                   TextAlignment="Right" />
-                                        <TextBlock Grid.Row="2"
-                                                   Grid.Column="0"
-                                                   Text="Offset Y" />
-                                        <Slider x:Name="ImageOffsetYSlider"
-                                                Grid.Row="2"
-                                                Grid.Column="1"
-                                                Minimum="-2"
-                                                Maximum="2"
-                                                TickFrequency="0.1"
-                                                ValueChanged="CropSlider_ValueChanged" />
-                                        <TextBlock x:Name="ImageOffsetYText"
-                                                   Grid.Row="2"
-                                                   Grid.Column="2"
-                                                   TextAlignment="Right" />
-                                    </Grid>
-                                </GroupBox>
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock Text="Cover crop"
+                                           Style="{StaticResource SectionTitle}" />
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="70" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Row="0"
+                                               Grid.Column="0"
+                                               Text="Scale"
+                                               Style="{StaticResource LabelText}" />
+                                    <Slider x:Name="ImageScaleSlider"
+                                            Grid.Row="0"
+                                            Grid.Column="1"
+                                            Minimum="1"
+                                            Maximum="4"
+                                            TickFrequency="0.1"
+                                            ValueChanged="CropSlider_ValueChanged" />
+                                    <TextBlock x:Name="ImageScaleText"
+                                               Grid.Row="0"
+                                               Grid.Column="2"
+                                               TextAlignment="Right" />
+                                    <TextBlock Grid.Row="1"
+                                               Grid.Column="0"
+                                               Text="Offset X"
+                                               Style="{StaticResource LabelText}" />
+                                    <Slider x:Name="ImageOffsetXSlider"
+                                            Grid.Row="1"
+                                            Grid.Column="1"
+                                            Minimum="-2"
+                                            Maximum="2"
+                                            TickFrequency="0.1"
+                                            ValueChanged="CropSlider_ValueChanged" />
+                                    <TextBlock x:Name="ImageOffsetXText"
+                                               Grid.Row="1"
+                                               Grid.Column="2"
+                                               TextAlignment="Right" />
+                                    <TextBlock Grid.Row="2"
+                                               Grid.Column="0"
+                                               Text="Offset Y"
+                                               Style="{StaticResource LabelText}" />
+                                    <Slider x:Name="ImageOffsetYSlider"
+                                            Grid.Row="2"
+                                            Grid.Column="1"
+                                            Minimum="-2"
+                                            Maximum="2"
+                                            TickFrequency="0.1"
+                                            ValueChanged="CropSlider_ValueChanged" />
+                                    <TextBlock x:Name="ImageOffsetYText"
+                                               Grid.Row="2"
+                                               Grid.Column="2"
+                                               TextAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
-                                <TextBlock Text="Source page URL" />
-                                <TextBox x:Name="SourcePageUrlBox"
-                                         Margin="0,4,0,10" />
-                                <TextBlock Text="Notes" />
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock Text="Images"
+                                           Style="{StaticResource SectionTitle}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Add local image"
+                                            Click="AddGalleryLocalButton_Click" />
+                                    <TextBox x:Name="GalleryUrlBox"
+                                             Width="300"
+                                             Margin="0,0,10,10"
+                                             ToolTip="Gallery image URL" />
+                                    <Button Content="Download URL"
+                                            Click="AddGalleryUrlButton_Click" />
+                                    <Button Content="Set as cover"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Click="SetGalleryCoverButton_Click" />
+                                    <Button Content="Remove"
+                                            Style="{StaticResource DangerButton}"
+                                            Click="RemoveGalleryImageButton_Click" />
+                                </StackPanel>
+                                <ListBox x:Name="GalleryList"
+                                         Height="250"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="150"
+                                                    Height="210"
+                                                    Padding="6"
+                                                    Margin="0,0,10,10"
+                                                    BorderBrush="{DynamicResource BorderBrushSoft}"
+                                                    BorderThickness="1"
+                                                    Background="{DynamicResource SurfaceAltBrush}">
+                                                <StackPanel>
+                                                    <Image Source="{Binding LocalPath}"
+                                                           Height="158"
+                                                           Stretch="UniformToFill" />
+                                                    <TextBlock Text="{Binding ArchiveName}"
+                                                               FontSize="11"
+                                                               Margin="0,6,0,0"
+                                                               Foreground="{DynamicResource MutedTextBrush}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock Text="Notes"
+                                           Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="Source page URL"
+                                           Style="{StaticResource LabelText}" />
+                                <TextBox x:Name="SourcePageUrlBox" />
+                                <TextBlock Text="Notes"
+                                           Style="{StaticResource LabelText}" />
                                 <TextBox x:Name="NotesBox"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"
-                                         MinHeight="90"
-                                         VerticalScrollBarVisibility="Auto"
-                                         Margin="0,4,0,10" />
-
+                                         MinHeight="120"
+                                         VerticalContentAlignment="Top"
+                                         VerticalScrollBarVisibility="Auto" />
                                 <StackPanel Orientation="Horizontal">
                                     <Button Content="Save"
                                             Click="SaveGameButton_Click" />
                                     <Button Content="Delete"
+                                            Style="{StaticResource DangerButton}"
                                             Click="DeleteGameButton_Click" />
                                 </StackPanel>
                             </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+
+            <ScrollViewer x:Name="AutoAddScreen"
+                          Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <Border Style="{StaticResource CyberPanel}"
+                        MaxWidth="860"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="Add by link"
+                                   Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="Store import"
+                                   Style="{StaticResource LabelText}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="130" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="AutoAddSourceBox"
+                                      Grid.Column="0"
+                                      Margin="0,4,12,12" />
+                            <TextBox x:Name="AutoAddReferenceBox"
+                                     Grid.Column="1"
+                                     Margin="0,4,12,12"
+                                     ToolTip="Steam AppID, store URL, or GOG/Epic slug" />
+                            <Button Grid.Column="2"
+                                    Content="Import"
+                                    Click="AutoAddButton_Click" />
                         </Grid>
-                    </ScrollViewer>
-                </TabItem>
+                        <TextBlock Text="Steam AppID, store URL, or GOG/Epic slug"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
 
-                <TabItem Header="Images">
-                    <Grid Margin="14">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="0"
-                                    Orientation="Horizontal"
-                                    Margin="0,0,0,10">
-                            <Button Content="Add local image"
-                                    Click="AddGalleryLocalButton_Click" />
-                            <TextBox x:Name="GalleryUrlBox"
-                                     Width="360"
-                                     Margin="0,0,8,8"
-                                     ToolTip="Gallery image URL" />
-                            <Button Content="Download URL"
-                                    Click="AddGalleryUrlButton_Click" />
-                            <Button Content="Set as cover"
-                                    Click="SetGalleryCoverButton_Click" />
-                            <Button Content="Remove"
-                                    Click="RemoveGalleryImageButton_Click" />
-                        </StackPanel>
-                        <ListBox x:Name="GalleryList"
-                                 Grid.Row="1"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListBox.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ListBox.ItemsPanel>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Width="160"
-                                            Height="220"
-                                            Padding="6"
-                                            Margin="0,0,10,10"
-                                            BorderBrush="{StaticResource BorderBrushSoft}"
-                                            BorderThickness="1"
-                                            CornerRadius="6">
-                                        <StackPanel>
-                                            <Image Source="{Binding LocalPath}"
-                                                   Height="168"
-                                                   Stretch="UniformToFill" />
-                                            <TextBlock Text="{Binding ArchiveName}"
-                                                       FontSize="11"
-                                                       Margin="0,6,0,0"
-                                                       TextWrapping="Wrap" />
-                                        </StackPanel>
+            <ScrollViewer x:Name="DetailsScreen"
+                          Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="360" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0"
+                                Margin="0,0,18,0">
+                        <Border Height="470"
+                                Background="{DynamicResource SurfaceAltBrush}"
+                                BorderBrush="{DynamicResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                ClipToBounds="True"
+                                Margin="0,0,0,14">
+                            <Image x:Name="DetailsCoverPreview"
+                                   Stretch="UniformToFill" />
+                        </Border>
+                        <Button Content="Edit"
+                                Click="EditCurrentGameButton_Click" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock x:Name="DetailTitleText"
+                                           Text="Game"
+                                           FontSize="34"
+                                           FontWeight="Black"
+                                           FontFamily="Consolas, Cascadia Mono, Segoe UI"
+                                           TextWrapping="Wrap" />
+                                <TextBlock x:Name="DetailSubtitleText"
+                                           Style="{StaticResource MutedText}"
+                                           FontSize="16"
+                                           Margin="0,8,0,16"
+                                           TextWrapping="Wrap" />
+                                <WrapPanel>
+                                    <Border Style="{StaticResource CyberChip}"
+                                            Margin="0,0,10,10">
+                                        <TextBlock x:Name="DetailStatusText"
+                                                   Foreground="{DynamicResource PrimaryBrush}"
+                                                   FontFamily="Consolas, Cascadia Mono, Segoe UI" />
                                     </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
-                </TabItem>
+                                    <Border Style="{StaticResource CyberChip}"
+                                            Margin="0,0,10,10">
+                                        <TextBlock x:Name="DetailYearText"
+                                                   Foreground="{DynamicResource SecondaryBrush}"
+                                                   FontFamily="Consolas, Cascadia Mono, Segoe UI" />
+                                    </Border>
+                                </WrapPanel>
+                                <TextBlock x:Name="DetailSourceText"
+                                           Style="{StaticResource MutedText}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock Text="Notes"
+                                           Style="{StaticResource SectionTitle}" />
+                                <TextBlock x:Name="DetailNotesText"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource CyberPanel}">
+                            <StackPanel>
+                                <TextBlock Text="Images"
+                                           Style="{StaticResource SectionTitle}" />
+                                <ListBox x:Name="DetailsGalleryList"
+                                         Height="250"
+                                         IsHitTestVisible="False"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="150"
+                                                    Height="210"
+                                                    Padding="6"
+                                                    Margin="0,0,10,10"
+                                                    BorderBrush="{DynamicResource BorderBrushSoft}"
+                                                    BorderThickness="1"
+                                                    Background="{DynamicResource SurfaceAltBrush}">
+                                                <StackPanel>
+                                                    <Image Source="{Binding LocalPath}"
+                                                           Height="166"
+                                                           Stretch="UniformToFill" />
+                                                    <TextBlock Text="{Binding ArchiveName}"
+                                                               FontSize="11"
+                                                               Margin="0,6,0,0"
+                                                               Foreground="{DynamicResource MutedTextBrush}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
 
-                <TabItem Header="References">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="14">
-                            <GroupBox Header="PC services">
-                                <DockPanel>
-                                    <StackPanel DockPanel.Dock="Top"
-                                                Orientation="Horizontal">
-                                        <TextBox x:Name="NewPcServiceBox"
-                                                 Width="260"
-                                                 Margin="0,0,8,8" />
-                                        <Button Content="Add service"
-                                                Click="AddPcServiceButton_Click" />
-                                    </StackPanel>
-                                    <ListBox x:Name="PcServicesList"
-                                             DisplayMemberPath="Name"
-                                             MinHeight="120" />
-                                </DockPanel>
-                            </GroupBox>
-                            <GroupBox Header="Console families">
-                                <DockPanel>
-                                    <StackPanel DockPanel.Dock="Top"
-                                                Orientation="Horizontal">
-                                        <TextBox x:Name="NewConsoleFamilyBox"
-                                                 Width="260"
-                                                 Margin="0,0,8,8" />
-                                        <Button Content="Add family"
-                                                Click="AddConsoleFamilyButton_Click" />
-                                    </StackPanel>
-                                    <ListBox x:Name="ConsoleFamiliesList"
-                                             DisplayMemberPath="Name"
-                                             MinHeight="120" />
-                                </DockPanel>
-                            </GroupBox>
-                            <GroupBox Header="Console models">
-                                <DockPanel>
-                                    <StackPanel DockPanel.Dock="Top"
-                                                Orientation="Horizontal">
-                                        <ComboBox x:Name="NewModelFamilyBox"
-                                                  Width="220"
-                                                  DisplayMemberPath="Name"
-                                                  SelectedValuePath="StableId"
-                                                  Margin="0,0,8,8" />
-                                        <TextBox x:Name="NewConsoleModelBox"
-                                                 Width="260"
-                                                 Margin="0,0,8,8" />
-                                        <Button Content="Add model"
-                                                Click="AddConsoleModelButton_Click" />
-                                    </StackPanel>
-                                    <ListBox x:Name="ConsoleModelsList"
-                                             DisplayMemberPath="Name"
-                                             MinHeight="160" />
-                                </DockPanel>
-                            </GroupBox>
-                        </StackPanel>
-                    </ScrollViewer>
-                </TabItem>
-
-                <TabItem Header="Import / Export">
-                    <StackPanel Margin="14">
-                        <GroupBox Header="Local backup/export folder">
+            <ScrollViewer x:Name="ImportExportScreen"
+                          Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Local backup/export folder"
+                                       Style="{StaticResource SectionTitle}" />
                             <DockPanel>
                                 <TextBox x:Name="BackupFolderBox"
                                          DockPanel.Dock="Left"
                                          MinWidth="520"
-                                         Margin="0,0,8,8" />
+                                         Margin="0,0,10,10" />
                                 <Button Content="Choose folder"
                                         Click="ChooseBackupFolderButton_Click" />
                             </DockPanel>
-                        </GroupBox>
-                        <GroupBox Header="Export">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Export JSON"
-                                        Click="ExportJsonButton_Click" />
-                                <Button Content="Export ZIP with images"
-                                        Click="ExportZipButton_Click" />
-                            </StackPanel>
-                        </GroupBox>
-                        <GroupBox Header="Import">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Import JSON"
-                                        Click="ImportJsonButton_Click" />
-                                <Button Content="Import ZIP"
-                                        Click="ImportZipButton_Click" />
-                            </StackPanel>
-                        </GroupBox>
-                        <GroupBox Header="Maintenance">
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Clear image cache"
-                                        Click="ClearImageCacheButton_Click" />
-                                <Button Content="Clear library"
-                                        Click="ClearLibraryButton_Click" />
-                            </StackPanel>
-                        </GroupBox>
-                    </StackPanel>
-                </TabItem>
-
-                <TabItem Header="Google Drive">
-                    <Grid Margin="14">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="0"
-                                    Orientation="Horizontal"
-                                    Margin="0,0,0,10">
-                            <Button Content="Connect account"
-                                    Click="ConnectDriveButton_Click" />
-                            <Button Content="Disconnect"
-                                    Click="DisconnectDriveButton_Click" />
-                            <Button Content="Upload ZIP backup"
-                                    Click="UploadDriveBackupButton_Click" />
-                            <Button Content="Auto export to Drive"
-                                    Click="AutoExportDriveBackupButton_Click" />
-                            <Button Content="Refresh list"
-                                    Click="RefreshDriveBackupsButton_Click" />
-                            <Button Content="Restore selected"
-                                    Click="RestoreSelectedDriveBackupButton_Click" />
-                            <Button Content="Restore latest"
-                                    Click="RestoreLatestDriveBackupButton_Click" />
-                            <Button Content="Move to trash"
-                                    Click="TrashDriveBackupButton_Click" />
                         </StackPanel>
-                        <DataGrid x:Name="DriveBackupsGrid"
-                                  Grid.Row="1"
-                                  AutoGenerateColumns="False"
-                                  IsReadOnly="True"
-                                  SelectionMode="Single">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Name"
-                                                    Binding="{Binding Name}"
-                                                    Width="*" />
-                                <DataGridTextColumn Header="Created"
-                                                    Binding="{Binding CreatedText}"
-                                                    Width="160" />
-                                <DataGridTextColumn Header="Size"
-                                                    Binding="{Binding SizeText}"
-                                                    Width="110" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-                        <TextBlock Grid.Row="2"
-                                   Text="Only the root /GameVault folder is used."
-                                   Foreground="#64748B"
-                                   Margin="0,10,0,0" />
-                    </Grid>
-                </TabItem>
-
-                <TabItem Header="Settings">
-                    <StackPanel Margin="14">
-                        <GroupBox Header="Theme">
-                            <StackPanel Orientation="Horizontal">
-                                <RadioButton x:Name="LightThemeButton"
-                                             Content="Light"
-                                             Margin="0,0,16,0"
-                                             Checked="ThemeButton_Checked" />
-                                <RadioButton x:Name="DarkThemeButton"
-                                             Content="Dark"
-                                             Checked="ThemeButton_Checked" />
+                    </Border>
+                    <UniformGrid Columns="2">
+                        <Border Style="{StaticResource CyberPanel}"
+                                Margin="0,0,8,16">
+                            <StackPanel>
+                                <TextBlock Text="Export"
+                                           Style="{StaticResource SectionTitle}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Export JSON"
+                                            Click="ExportJsonButton_Click" />
+                                    <Button Content="Export ZIP with images"
+                                            Click="ExportZipButton_Click" />
+                                </StackPanel>
                             </StackPanel>
-                        </GroupBox>
-                        <GroupBox Header="Language">
+                        </Border>
+                        <Border Style="{StaticResource CyberPanel}"
+                                Margin="8,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Import"
+                                           Style="{StaticResource SectionTitle}" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Import JSON"
+                                            Click="ImportJsonButton_Click" />
+                                    <Button Content="Import ZIP"
+                                            Click="ImportZipButton_Click" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Google Drive"
+                                       Style="{StaticResource SectionTitle}" />
+                            <WrapPanel>
+                                <Button Content="Connect account"
+                                        Click="ConnectDriveButton_Click" />
+                                <Button Content="Disconnect"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Click="DisconnectDriveButton_Click" />
+                                <Button Content="Upload ZIP backup"
+                                        Click="UploadDriveBackupButton_Click" />
+                                <Button Content="Auto export to Drive"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Click="AutoExportDriveBackupButton_Click" />
+                                <Button Content="Refresh list"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Click="RefreshDriveBackupsButton_Click" />
+                                <Button Content="Restore selected"
+                                        Click="RestoreSelectedDriveBackupButton_Click" />
+                                <Button Content="Restore latest"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Click="RestoreLatestDriveBackupButton_Click" />
+                                <Button Content="Move to trash"
+                                        Style="{StaticResource DangerButton}"
+                                        Click="TrashDriveBackupButton_Click" />
+                            </WrapPanel>
+                            <DataGrid x:Name="DriveBackupsGrid"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      SelectionMode="Single"
+                                      MinHeight="260">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Name"
+                                                        Binding="{Binding Name}"
+                                                        Width="*" />
+                                    <DataGridTextColumn Header="Created"
+                                                        Binding="{Binding CreatedText}"
+                                                        Width="160" />
+                                    <DataGridTextColumn Header="Size"
+                                                        Binding="{Binding SizeText}"
+                                                        Width="110" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <TextBlock Text="Only the root /GameVault folder is used."
+                                       Style="{StaticResource MutedText}"
+                                       Margin="0,10,0,0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer x:Name="SettingsScreen"
+                          Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="900"
+                            HorizontalAlignment="Center">
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Theme"
+                                       Style="{StaticResource SectionTitle}" />
+                            <ComboBox x:Name="ThemeBox"
+                                      DisplayMemberPath="Text"
+                                      SelectedValuePath="Value"
+                                      SelectionChanged="ThemeBox_SelectionChanged" />
+                            <Button Content="Theme editor"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HorizontalAlignment="Left"
+                                    Click="OpenThemeEditorButton_Click" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Language"
+                                       Style="{StaticResource SectionTitle}" />
                             <ComboBox x:Name="LanguageBox"
-                                      Width="220"
+                                      Width="260"
                                       HorizontalAlignment="Left"
                                       SelectionChanged="LanguageBox_SelectionChanged" />
-                        </GroupBox>
-                    </StackPanel>
-                </TabItem>
-            </TabControl>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Feedback"
+                                       Style="{StaticResource SectionTitle}" />
+                            <CheckBox Content="Button sound" />
+                            <CheckBox Content="Visual click feedback"
+                                      IsChecked="True" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Maintenance"
+                                       Style="{StaticResource SectionTitle}" />
+                            <WrapPanel>
+                                <Button Content="Import / Export"
+                                        Click="OpenImportExportButton_Click" />
+                                <Button Content="References"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Click="OpenReferencesButton_Click" />
+                                <Button Content="Clear image cache"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Click="ClearImageCacheButton_Click" />
+                                <Button Content="Clear library"
+                                        Style="{StaticResource DangerButton}"
+                                        Click="ClearLibraryButton_Click" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer x:Name="ThemeEditorScreen"
+                          Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="900"
+                            HorizontalAlignment="Center">
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Built-in themes"
+                                       Style="{StaticResource SectionTitle}" />
+                            <ComboBox x:Name="ThemeEditorThemeBox"
+                                      DisplayMemberPath="Text"
+                                      SelectedValuePath="Value" />
+                            <Button Content="Apply theme"
+                                    HorizontalAlignment="Left"
+                                    Click="ApplyThemeFromEditorButton_Click" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Custom theme"
+                                       Style="{StaticResource SectionTitle}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0"
+                                            Margin="0,0,12,0">
+                                    <TextBlock Text="Name"
+                                               Style="{StaticResource LabelText}" />
+                                    <TextBox x:Name="CustomThemeNameBox" />
+                                    <TextBlock Text="Background"
+                                               Style="{StaticResource LabelText}" />
+                                    <TextBox x:Name="CustomThemeBackgroundBox" />
+                                    <TextBlock Text="Surface"
+                                               Style="{StaticResource LabelText}" />
+                                    <TextBox x:Name="CustomThemeSurfaceBox" />
+                                    <TextBlock Text="Panel"
+                                               Style="{StaticResource LabelText}" />
+                                    <TextBox x:Name="CustomThemePanelBox" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Text"
+                                               Style="{StaticResource LabelText}" />
+                                    <TextBox x:Name="CustomThemeTextBox" />
+                                    <TextBlock Text="Muted text"
+                                               Style="{StaticResource LabelText}" />
+                                    <TextBox x:Name="CustomThemeMutedBox" />
+                                    <TextBlock Text="Primary"
+                                               Style="{StaticResource LabelText}" />
+                                    <TextBox x:Name="CustomThemePrimaryBox" />
+                                    <TextBlock Text="Secondary"
+                                               Style="{StaticResource LabelText}" />
+                                    <TextBox x:Name="CustomThemeSecondaryBox" />
+                                </StackPanel>
+                            </Grid>
+                            <WrapPanel>
+                                <Button Content="Save custom theme"
+                                        Click="SaveCustomThemeButton_Click" />
+                                <Button Content="Delete custom theme"
+                                        Style="{StaticResource DangerButton}"
+                                        Click="DeleteCustomThemeButton_Click" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer x:Name="ReferencesScreen"
+                          Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top"
+                                        Orientation="Horizontal">
+                                <TextBox x:Name="NewPcServiceBox"
+                                         Width="300"
+                                         Margin="0,0,10,10" />
+                                <Button Content="Add service"
+                                        Click="AddPcServiceButton_Click" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="PC services"
+                                           Style="{StaticResource SectionTitle}" />
+                                <ListBox x:Name="PcServicesList"
+                                         DisplayMemberPath="Name"
+                                         MinHeight="130" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top"
+                                        Orientation="Horizontal">
+                                <TextBox x:Name="NewConsoleFamilyBox"
+                                         Width="300"
+                                         Margin="0,0,10,10" />
+                                <Button Content="Add family"
+                                        Click="AddConsoleFamilyButton_Click" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Console families"
+                                           Style="{StaticResource SectionTitle}" />
+                                <ListBox x:Name="ConsoleFamiliesList"
+                                         DisplayMemberPath="Name"
+                                         MinHeight="130" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top"
+                                        Orientation="Horizontal">
+                                <ComboBox x:Name="NewModelFamilyBox"
+                                          Width="220"
+                                          DisplayMemberPath="Name"
+                                          SelectedValuePath="StableId"
+                                          Margin="0,4,10,10" />
+                                <TextBox x:Name="NewConsoleModelBox"
+                                         Width="300"
+                                         Margin="0,0,10,10" />
+                                <Button Content="Add model"
+                                        Click="AddConsoleModelButton_Click" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Console models"
+                                           Style="{StaticResource SectionTitle}" />
+                                <ListBox x:Name="ConsoleModelsList"
+                                         DisplayMemberPath="Name"
+                                         MinHeight="170" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </Window>

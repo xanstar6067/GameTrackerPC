@@ -11,6 +11,9 @@ using GameTrackerPC.Models;
 using GameTrackerPC.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
+using DoubleAnimation = System.Windows.Media.Animation.DoubleAnimation;
+using EasingMode = System.Windows.Media.Animation.EasingMode;
+using QuadraticEase = System.Windows.Media.Animation.QuadraticEase;
 
 namespace GameTrackerPC;
 
@@ -26,8 +29,14 @@ public partial class MainWindow : Window
     private string _loadedNotesDisplay = string.Empty;
     private bool _driveAuthWarningShown;
     private bool _loading;
+    private bool _updatingThemeControls;
+    private bool _suppressGameSelectionNavigation;
     private LibraryViewMode _viewMode = LibraryViewMode.List;
     private string _language = RussianLanguage;
+    private AppThemeMode _currentTheme = AppThemeMode.Light;
+    private AppScreen _currentScreen = AppScreen.Start;
+    private readonly Stack<AppScreen> _navigationStack = new();
+    private ThemePalette _customTheme = ThemePalette.DefaultCustom;
 
     public MainWindow()
     {
@@ -73,10 +82,18 @@ public partial class MainWindow : Window
         PlatformBox.SelectedValuePath = nameof(UiOption<PlatformType>.Value);
         LanguageBox.DisplayMemberPath = nameof(UiOption<string>.Text);
         LanguageBox.SelectedValuePath = nameof(UiOption<string>.Value);
+        StartThemeBox.DisplayMemberPath = nameof(UiOption<AppThemeMode>.Text);
+        StartThemeBox.SelectedValuePath = nameof(UiOption<AppThemeMode>.Value);
+        ThemeBox.DisplayMemberPath = nameof(UiOption<AppThemeMode>.Text);
+        ThemeBox.SelectedValuePath = nameof(UiOption<AppThemeMode>.Value);
+        ThemeEditorThemeBox.DisplayMemberPath = nameof(UiOption<AppThemeMode>.Text);
+        ThemeEditorThemeBox.SelectedValuePath = nameof(UiOption<AppThemeMode>.Value);
         RefreshOptionControls();
+        RefreshThemeControls();
         AutoAddSourceBox.ItemsSource = _autoAddService.SupportedSources;
         AutoAddSourceBox.SelectedItem = AutoAddSource.Steam;
         ImageScaleSlider.Value = 1;
+        ShowScreen(AppScreen.Start, animate: false);
     }
 
     private async Task LoadSettingsAsync()
@@ -91,11 +108,12 @@ public partial class MainWindow : Window
         _viewMode = Enum.TryParse<LibraryViewMode>(viewModeText, out var viewMode) ? viewMode : LibraryViewMode.List;
         ApplyViewMode();
 
+        await LoadCustomThemeAsync(db);
+        RefreshThemeControls();
         var themeText = await GetSettingAsync(db, AppSettingKeys.Theme, AppThemeMode.Light.ToString());
         var theme = Enum.TryParse<AppThemeMode>(themeText, out var parsedTheme) ? parsedTheme : AppThemeMode.Light;
-        LightThemeButton.IsChecked = theme == AppThemeMode.Light;
-        DarkThemeButton.IsChecked = theme == AppThemeMode.Dark;
         ApplyTheme(theme);
+        SelectThemeControls(theme);
     }
 
     private static async Task<string> GetSettingAsync(GameVaultDbContext db, string key, string fallback)
@@ -190,7 +208,15 @@ public partial class MainWindow : Window
 
         if (!string.IsNullOrWhiteSpace(selectedId))
         {
-            GamesList.SelectedItem = _gameItems.FirstOrDefault(item => item.Id == selectedId);
+            _suppressGameSelectionNavigation = true;
+            try
+            {
+                GamesList.SelectedItem = _gameItems.FirstOrDefault(item => item.Id == selectedId);
+            }
+            finally
+            {
+                _suppressGameSelectionNavigation = false;
+            }
         }
     }
 
@@ -222,12 +248,16 @@ public partial class MainWindow : Window
 
     private async void GamesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_loading || GamesList.SelectedItem is not GameListItem item)
+        if (_loading || _suppressGameSelectionNavigation || GamesList.SelectedItem is not GameListItem item)
         {
             return;
         }
 
-        await RunUiActionAsync(T("UnableLoadGame"), () => LoadGameIntoEditorAsync(item.Id));
+        await RunUiActionAsync(T("UnableLoadGame"), async () =>
+        {
+            await LoadGameIntoEditorAsync(item.Id);
+            Navigate(AppScreen.Details);
+        });
     }
 
     private async Task LoadGameIntoEditorAsync(string gameId)
@@ -237,6 +267,8 @@ public partial class MainWindow : Window
             .Include(item => item.Statuses)
             .Include(item => item.ImageGallery)
             .FirstAsync(item => item.Id == gameId);
+        var pcServices = await db.PcServices.ToDictionaryAsync(service => service.StableId, service => service.Name);
+        var consoleModels = await db.ConsoleModels.ToDictionaryAsync(model => model.StableId, model => model.Name);
 
         _loading = true;
         try
@@ -258,7 +290,15 @@ public partial class MainWindow : Window
             ImageOffsetYSlider.Value = game.ImageOffsetY;
             SetStatusCheckboxes(game.Statuses.Select(status => status.Status).ToHashSet());
             SetCoverPreview(game.ImageLocalPath);
-            GalleryList.ItemsSource = game.ImageGallery.OrderBy(image => image.SortOrder).ToList();
+            var gallery = game.ImageGallery.OrderBy(image => image.SortOrder).ToList();
+            GalleryList.ItemsSource = gallery;
+            DetailsGalleryList.ItemsSource = gallery;
+            DetailTitleText.Text = game.Title;
+            DetailSubtitleText.Text = BuildSubtitle(game, pcServices, consoleModels);
+            DetailStatusText.Text = FormatStatuses(game.Statuses.Select(status => status.Status));
+            DetailYearText.Text = game.Year?.ToString(CultureInfo.InvariantCulture) ?? "-";
+            DetailSourceText.Text = string.IsNullOrWhiteSpace(game.SourcePageUrl) ? "-" : game.SourcePageUrl;
+            DetailNotesText.Text = string.IsNullOrWhiteSpace(_loadedNotesDisplay) ? "-" : _loadedNotesDisplay;
             UpdateCropText();
             ApplyPlatformControls();
         }
@@ -268,7 +308,43 @@ public partial class MainWindow : Window
         }
     }
 
-    private void NewGameButton_Click(object sender, RoutedEventArgs e) => NewGame();
+    private void NewGameButton_Click(object sender, RoutedEventArgs e) => Navigate(AppScreen.AddMode);
+
+    private void StartButton_Click(object sender, RoutedEventArgs e) => Navigate(AppScreen.Menu);
+
+    private void OpenDatabaseButton_Click(object sender, RoutedEventArgs e) => Navigate(AppScreen.Database);
+
+    private void OpenSettingsButton_Click(object sender, RoutedEventArgs e) => Navigate(AppScreen.Settings);
+
+    private void OpenImportExportButton_Click(object sender, RoutedEventArgs e) => Navigate(AppScreen.ImportExport);
+
+    private void OpenReferencesButton_Click(object sender, RoutedEventArgs e) => Navigate(AppScreen.References);
+
+    private void OpenThemeEditorButton_Click(object sender, RoutedEventArgs e) => Navigate(AppScreen.ThemeEditor);
+
+    private void ExitButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void ManualAddButton_Click(object sender, RoutedEventArgs e)
+    {
+        NewGame();
+        Navigate(AppScreen.ManualEdit);
+    }
+
+    private void AutoAddModeButton_Click(object sender, RoutedEventArgs e) => Navigate(AppScreen.AutoAdd);
+
+    private void EditCurrentGameButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_currentGameId))
+        {
+            return;
+        }
+
+        Navigate(AppScreen.ManualEdit);
+    }
+
+    private void BackButton_Click(object sender, RoutedEventArgs e) => Back();
+
+    private void HomeButton_Click(object sender, RoutedEventArgs e) => Home();
 
     private void NewGame()
     {
@@ -294,6 +370,13 @@ public partial class MainWindow : Window
             SetStatusCheckboxes(new HashSet<GameStatus> { GameStatus.PLANNED });
             SetCoverPreview(null);
             GalleryList.ItemsSource = null;
+            DetailsGalleryList.ItemsSource = null;
+            DetailTitleText.Text = T("New");
+            DetailSubtitleText.Text = string.Empty;
+            DetailStatusText.Text = StatusName(GameStatus.PLANNED);
+            DetailYearText.Text = "-";
+            DetailSourceText.Text = "-";
+            DetailNotesText.Text = "-";
             UpdateCropText();
         }
         finally
@@ -302,13 +385,142 @@ public partial class MainWindow : Window
         }
     }
 
+    private void Navigate(AppScreen screen)
+    {
+        if (_currentScreen == screen)
+        {
+            return;
+        }
+
+        _navigationStack.Push(_currentScreen);
+        ShowScreen(screen);
+    }
+
+    private void ReplaceCurrent(AppScreen screen)
+    {
+        ShowScreen(screen);
+    }
+
+    private void Back()
+    {
+        if (_navigationStack.Count == 0)
+        {
+            Home();
+            return;
+        }
+
+        ShowScreen(_navigationStack.Pop());
+    }
+
+    private void Home()
+    {
+        _navigationStack.Clear();
+        ShowScreen(AppScreen.Menu);
+    }
+
+    private void ShowScreen(AppScreen screen, bool animate = true)
+    {
+        _currentScreen = screen;
+        foreach (var element in ScreenElements())
+        {
+            element.Visibility = Visibility.Collapsed;
+        }
+
+        var target = GetScreenElement(screen);
+        target.Visibility = Visibility.Visible;
+        if (animate)
+        {
+            target.Opacity = 0;
+            target.BeginAnimation(
+                OpacityProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                });
+        }
+        else
+        {
+            target.Opacity = 1;
+        }
+
+        BackButton.Visibility = screen == AppScreen.Start ? Visibility.Collapsed : Visibility.Visible;
+        HomeButton.Visibility = screen is AppScreen.Start or AppScreen.Menu ? Visibility.Collapsed : Visibility.Visible;
+        ScreenTitleText.Text = ScreenTitle(screen);
+        ScreenSubtitleText.Text = ScreenSubtitle(screen);
+    }
+
+    private IEnumerable<FrameworkElement> ScreenElements()
+    {
+        yield return StartScreen;
+        yield return MenuScreen;
+        yield return DatabaseScreen;
+        yield return AddModeScreen;
+        yield return ManualEditScreen;
+        yield return AutoAddScreen;
+        yield return DetailsScreen;
+        yield return ImportExportScreen;
+        yield return SettingsScreen;
+        yield return ThemeEditorScreen;
+        yield return ReferencesScreen;
+    }
+
+    private FrameworkElement GetScreenElement(AppScreen screen) => screen switch
+    {
+        AppScreen.Start => StartScreen,
+        AppScreen.Menu => MenuScreen,
+        AppScreen.Database => DatabaseScreen,
+        AppScreen.AddMode => AddModeScreen,
+        AppScreen.ManualEdit => ManualEditScreen,
+        AppScreen.AutoAdd => AutoAddScreen,
+        AppScreen.Details => DetailsScreen,
+        AppScreen.ImportExport => ImportExportScreen,
+        AppScreen.Settings => SettingsScreen,
+        AppScreen.ThemeEditor => ThemeEditorScreen,
+        AppScreen.References => ReferencesScreen,
+        _ => StartScreen
+    };
+
+    private string ScreenTitle(AppScreen screen) => screen switch
+    {
+        AppScreen.Start => "GAMEVAULT",
+        AppScreen.Menu => T("Menu"),
+        AppScreen.Database => T("Database"),
+        AppScreen.AddMode => T("New record"),
+        AppScreen.ManualEdit => T("Manual add"),
+        AppScreen.AutoAdd => T("Add by link"),
+        AppScreen.Details => T("Details"),
+        AppScreen.ImportExport => T("Import / Export"),
+        AppScreen.Settings => T("Settings"),
+        AppScreen.ThemeEditor => T("Theme editor"),
+        AppScreen.References => T("References"),
+        _ => "GAMEVAULT"
+    };
+
+    private string ScreenSubtitle(AppScreen screen) => screen switch
+    {
+        AppScreen.Start => T("Desktop library"),
+        AppScreen.Menu => T("Choose action"),
+        AppScreen.Database => T("Search, filter, sort, and open game cards"),
+        AppScreen.AddMode => T("Choose how to add a game"),
+        AppScreen.ManualEdit => T("Create or edit game metadata"),
+        AppScreen.AutoAdd => T("Import game metadata from store pages"),
+        AppScreen.Details => T("Cover, gallery, statuses, and notes"),
+        AppScreen.ImportExport => T("JSON, ZIP, and Google Drive backups"),
+        AppScreen.Settings => T("Themes, language, feedback, and maintenance"),
+        AppScreen.ThemeEditor => T("Built-in and custom color modes"),
+        AppScreen.References => T("Services, console families, and models"),
+        _ => string.Empty
+    };
+
     private async void SaveGameButton_Click(object sender, RoutedEventArgs e)
     {
         await RunUiActionAsync(T("UnableSaveGame"), async () =>
         {
             var id = await SaveCurrentGameAsync();
             await LoadGamesAsync(id);
+            await LoadGameIntoEditorAsync(id);
             SetStatus(T("GameSaved"));
+            ReplaceCurrent(AppScreen.Details);
         });
     }
 
@@ -336,6 +548,7 @@ public partial class MainWindow : Window
             if (!string.IsNullOrWhiteSpace(result.GameId))
             {
                 await LoadGameIntoEditorAsync(result.GameId);
+                ReplaceCurrent(AppScreen.Details);
             }
 
             AutoAddReferenceBox.Text = string.Empty;
@@ -637,6 +850,7 @@ public partial class MainWindow : Window
             await LoadGamesAsync();
             NewGame();
             SetStatus(T("GameDeleted"));
+            ReplaceCurrent(AppScreen.Database);
         });
     }
 
@@ -1246,17 +1460,20 @@ public partial class MainWindow : Window
         await SetSettingAsync(db, AppSettingKeys.ViewMode, _viewMode.ToString());
     }
 
-    private async void ThemeButton_Checked(object sender, RoutedEventArgs e)
+    private async void ThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_loading || _transferService is null)
+        if (_loading || _updatingThemeControls || _transferService is null)
         {
             return;
         }
 
-        var theme = DarkThemeButton.IsChecked == true ? AppThemeMode.Dark : AppThemeMode.Light;
-        ApplyTheme(theme);
-        await using var db = CreateDb();
-        await SetSettingAsync(db, AppSettingKeys.Theme, theme.ToString());
+        var theme = sender switch
+        {
+            ComboBox box when box.SelectedValue is AppThemeMode selectedTheme => selectedTheme,
+            _ => _currentTheme
+        };
+
+        await ApplyAndSaveThemeAsync(theme);
     }
 
     private async void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1277,11 +1494,221 @@ public partial class MainWindow : Window
         SetStatus(T("LanguageChanged"));
     }
 
+    private async Task LoadCustomThemeAsync(GameVaultDbContext db)
+    {
+        _customTheme = new ThemePalette(
+            await GetSettingAsync(db, AppSettingKeys.CustomThemeName, "Custom"),
+            await GetSettingAsync(db, AppSettingKeys.CustomThemeBackground, "#10131F"),
+            await GetSettingAsync(db, AppSettingKeys.CustomThemeSurface, "#171A29"),
+            await GetSettingAsync(db, AppSettingKeys.CustomThemePanel, "#0D101A"),
+            await GetSettingAsync(db, AppSettingKeys.CustomThemeText, "#F7F7FF"),
+            await GetSettingAsync(db, AppSettingKeys.CustomThemeMuted, "#A9B1C7"),
+            await GetSettingAsync(db, AppSettingKeys.CustomThemePrimary, "#7CF7C7"),
+            await GetSettingAsync(db, AppSettingKeys.CustomThemeSecondary, "#F7D56E"));
+        UpdateCustomThemeFields();
+    }
+
+    private async Task ApplyAndSaveThemeAsync(AppThemeMode theme)
+    {
+        ApplyTheme(theme);
+        SelectThemeControls(theme);
+        await using var db = CreateDb();
+        await SetSettingAsync(db, AppSettingKeys.Theme, theme.ToString());
+    }
+
     private void ApplyTheme(AppThemeMode theme)
     {
-        Background = theme == AppThemeMode.Dark
-            ? new SolidColorBrush(Color.FromRgb(30, 41, 59))
-            : new SolidColorBrush(Color.FromRgb(238, 242, 247));
+        _currentTheme = theme;
+        var palette = GetThemePalette(theme);
+        SetBrush("AppBackgroundBrush", palette.Background);
+        SetBrush("SurfaceBrush", palette.Surface);
+        SetBrush("SurfaceAltBrush", Shade(palette.Surface, 1.12));
+        SetBrush("PanelBrush", palette.Panel);
+        SetBrush("TextBrush", palette.Text);
+        SetBrush("MutedTextBrush", palette.Muted);
+        SetBrush("BorderBrushSoft", Blend(palette.Primary, palette.Surface, 0.55));
+        SetBrush("PrimaryBrush", palette.Primary);
+        SetBrush("PrimaryHoverBrush", Shade(palette.Primary, 1.18));
+        SetBrush("PrimaryPressedBrush", Shade(palette.Primary, 0.72));
+        SetBrush("SecondaryBrush", palette.Secondary);
+        SetBrush("ButtonTextBrush", palette.ButtonText);
+        SetBrush("DangerBrush", palette.Danger);
+        SetBrush("InputBrush", Shade(palette.Panel, 1.08));
+        SetBrush("InputTextBrush", palette.Text);
+        SetBrush("ChipBrush", Blend(palette.Primary, palette.Panel, 0.22));
+        Background = (Brush)Resources["AppBackgroundBrush"];
+    }
+
+    private ThemePalette GetThemePalette(AppThemeMode theme) => theme switch
+    {
+        AppThemeMode.Dark => new("Dark", "#07111F", "#111E31", "#0A1424", "#F8FAFC", "#94A3B8", "#38F2C2", "#FACC15"),
+        AppThemeMode.Oled => new("OLED", "#000000", "#070707", "#000000", "#FFFFFF", "#9CA3AF", "#00F5D4", "#E879F9"),
+        AppThemeMode.Cyberpunk => new("Cyberpunk", "#10091A", "#1B1029", "#0C0714", "#FDF4FF", "#D8B4FE", "#F8E71C", "#00E5FF", "#FF2D95"),
+        AppThemeMode.HalfLife => new("Half-Life", "#130E08", "#21170D", "#0C0905", "#FFF7ED", "#D6B28C", "#FF7A18", "#80C342"),
+        AppThemeMode.Custom => _customTheme,
+        _ => new("Light", "#EEF2F7", "#FFFFFF", "#F8FAFC", "#0F172A", "#475569", "#0F766E", "#B45309", "#DC2626", "#FFFFFF")
+    };
+
+    private void SetBrush(string key, string color)
+    {
+        Resources[key] = new SolidColorBrush(ParseColor(color));
+    }
+
+    private static Color ParseColor(string color)
+    {
+        try
+        {
+            return (Color)ColorConverter.ConvertFromString(color);
+        }
+        catch
+        {
+            return Colors.Magenta;
+        }
+    }
+
+    private static string Shade(string color, double factor)
+    {
+        var parsed = ParseColor(color);
+        return ColorToHex(Color.FromRgb(
+            (byte)Math.Clamp(parsed.R * factor, 0, 255),
+            (byte)Math.Clamp(parsed.G * factor, 0, 255),
+            (byte)Math.Clamp(parsed.B * factor, 0, 255)));
+    }
+
+    private static string Blend(string foreground, string background, double amount)
+    {
+        var fg = ParseColor(foreground);
+        var bg = ParseColor(background);
+        return ColorToHex(Color.FromRgb(
+            (byte)(bg.R + (fg.R - bg.R) * amount),
+            (byte)(bg.G + (fg.G - bg.G) * amount),
+            (byte)(bg.B + (fg.B - bg.B) * amount)));
+    }
+
+    private static string ColorToHex(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+
+    private void RefreshThemeControls()
+    {
+        var themes = new UiOption<AppThemeMode>[]
+        {
+            new(AppThemeMode.Light, T("Light")),
+            new(AppThemeMode.Dark, T("Dark")),
+            new(AppThemeMode.Oled, "OLED"),
+            new(AppThemeMode.Cyberpunk, "Cyberpunk"),
+            new(AppThemeMode.HalfLife, "Half-Life"),
+            new(AppThemeMode.Custom, _customTheme.Name)
+        };
+
+        _updatingThemeControls = true;
+        try
+        {
+            StartThemeBox.ItemsSource = themes;
+            ThemeBox.ItemsSource = themes;
+            ThemeEditorThemeBox.ItemsSource = themes;
+            SelectThemeControls(_currentTheme);
+        }
+        finally
+        {
+            _updatingThemeControls = false;
+        }
+    }
+
+    private void SelectThemeControls(AppThemeMode theme)
+    {
+        _updatingThemeControls = true;
+        try
+        {
+            StartThemeBox.SelectedValue = theme;
+            ThemeBox.SelectedValue = theme;
+            ThemeEditorThemeBox.SelectedValue = theme;
+        }
+        finally
+        {
+            _updatingThemeControls = false;
+        }
+    }
+
+    private void UpdateCustomThemeFields()
+    {
+        if (CustomThemeNameBox is null)
+        {
+            return;
+        }
+
+        CustomThemeNameBox.Text = _customTheme.Name;
+        CustomThemeBackgroundBox.Text = _customTheme.Background;
+        CustomThemeSurfaceBox.Text = _customTheme.Surface;
+        CustomThemePanelBox.Text = _customTheme.Panel;
+        CustomThemeTextBox.Text = _customTheme.Text;
+        CustomThemeMutedBox.Text = _customTheme.Muted;
+        CustomThemePrimaryBox.Text = _customTheme.Primary;
+        CustomThemeSecondaryBox.Text = _customTheme.Secondary;
+    }
+
+    private async void ApplyThemeFromEditorButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ThemeEditorThemeBox.SelectedValue is AppThemeMode theme)
+        {
+            await ApplyAndSaveThemeAsync(theme);
+        }
+    }
+
+    private async void SaveCustomThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiActionAsync(T("UnableSaveTheme"), async () =>
+        {
+            _customTheme = new ThemePalette(
+                string.IsNullOrWhiteSpace(CustomThemeNameBox.Text) ? "Custom" : CustomThemeNameBox.Text.Trim(),
+                NormalizeColor(CustomThemeBackgroundBox.Text),
+                NormalizeColor(CustomThemeSurfaceBox.Text),
+                NormalizeColor(CustomThemePanelBox.Text),
+                NormalizeColor(CustomThemeTextBox.Text),
+                NormalizeColor(CustomThemeMutedBox.Text),
+                NormalizeColor(CustomThemePrimaryBox.Text),
+                NormalizeColor(CustomThemeSecondaryBox.Text));
+
+            await using var db = CreateDb();
+            await SaveCustomThemeSettingsAsync(db);
+            RefreshThemeControls();
+            ApplyTheme(AppThemeMode.Custom);
+            SelectThemeControls(AppThemeMode.Custom);
+            await SetSettingAsync(db, AppSettingKeys.Theme, AppThemeMode.Custom.ToString());
+            SetStatus(T("CustomThemeSaved"));
+        });
+    }
+
+    private async void DeleteCustomThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiActionAsync(T("UnableDeleteTheme"), async () =>
+        {
+            _customTheme = ThemePalette.DefaultCustom;
+            UpdateCustomThemeFields();
+            await using var db = CreateDb();
+            await SaveCustomThemeSettingsAsync(db);
+            RefreshThemeControls();
+            ApplyTheme(AppThemeMode.Light);
+            SelectThemeControls(AppThemeMode.Light);
+            await SetSettingAsync(db, AppSettingKeys.Theme, AppThemeMode.Light.ToString());
+            SetStatus(T("CustomThemeDeleted"));
+        });
+    }
+
+    private async Task SaveCustomThemeSettingsAsync(GameVaultDbContext db)
+    {
+        await SetSettingAsync(db, AppSettingKeys.CustomThemeName, _customTheme.Name);
+        await SetSettingAsync(db, AppSettingKeys.CustomThemeBackground, _customTheme.Background);
+        await SetSettingAsync(db, AppSettingKeys.CustomThemeSurface, _customTheme.Surface);
+        await SetSettingAsync(db, AppSettingKeys.CustomThemePanel, _customTheme.Panel);
+        await SetSettingAsync(db, AppSettingKeys.CustomThemeText, _customTheme.Text);
+        await SetSettingAsync(db, AppSettingKeys.CustomThemeMuted, _customTheme.Muted);
+        await SetSettingAsync(db, AppSettingKeys.CustomThemePrimary, _customTheme.Primary);
+        await SetSettingAsync(db, AppSettingKeys.CustomThemeSecondary, _customTheme.Secondary);
+    }
+
+    private static string NormalizeColor(string value)
+    {
+        var color = ParseColor(value.Trim());
+        return ColorToHex(color);
     }
 
     private void PlatformBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1324,6 +1751,7 @@ public partial class MainWindow : Window
             : RussianLanguage;
         CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(_language == RussianLanguage ? "ru-RU" : "en-US");
         RefreshOptionControls();
+        RefreshThemeControls();
         ApplyLanguage();
     }
 
@@ -1531,7 +1959,9 @@ public partial class MainWindow : Window
 
     private void SetCoverPreview(string? path)
     {
-        CoverPreview.Source = LoadBitmap(path);
+        var bitmap = LoadBitmap(path);
+        CoverPreview.Source = bitmap;
+        DetailsCoverPreview.Source = bitmap;
     }
 
     private static BitmapImage? LoadBitmap(string? path)
@@ -1639,6 +2069,21 @@ public partial class MainWindow : Window
 
     private sealed record UiOption<T>(T Value, string Text);
     private sealed record AutoImportedImage(string LocalPath, string ArchiveName, string SourceUrl);
+    private sealed record ThemePalette(
+        string Name,
+        string Background,
+        string Surface,
+        string Panel,
+        string Text,
+        string Muted,
+        string Primary,
+        string Secondary,
+        string Danger = "#FF4D6D",
+        string ButtonText = "#061019")
+    {
+        public static ThemePalette DefaultCustom { get; } =
+            new("Custom", "#10131F", "#171A29", "#0D101A", "#F7F7FF", "#A9B1C7", "#7CF7C7", "#F7D56E");
+    }
 
     private enum SortMode
     {
@@ -1648,6 +2093,21 @@ public partial class MainWindow : Window
         Year,
         Created,
         Updated
+    }
+
+    private enum AppScreen
+    {
+        Start,
+        Menu,
+        Database,
+        AddMode,
+        ManualEdit,
+        AutoAdd,
+        Details,
+        ImportExport,
+        Settings,
+        ThemeEditor,
+        References
     }
 
     private const int MaxAutoGalleryImages = 20;
@@ -1821,7 +2281,55 @@ public partial class MainWindow : Window
         ["Theme"] = "Тема",
         ["Light"] = "Светлая",
         ["Dark"] = "Тёмная",
-        ["Language"] = "Язык"
+        ["Language"] = "Язык",
+        ["Back"] = "Назад",
+        ["Home"] = "Домой",
+        ["Start"] = "Старт",
+        ["Desktop collection control"] = "Управление игровой коллекцией на ПК",
+        ["Use the same visual modes as the mobile GameVault shell."] = "Используйте те же визуальные режимы, что и в мобильной оболочке GameVault.",
+        ["Menu"] = "Меню",
+        ["New record"] = "Новая запись",
+        ["Database"] = "База данных",
+        ["Exit"] = "Выход",
+        ["Sort"] = "Сортировка",
+        ["Manual add"] = "Вручную",
+        ["Add by link"] = "По ссылке",
+        ["Main"] = "Основное",
+        ["Platform / Distribution"] = "Платформа / дистрибуция",
+        ["Details"] = "Детали",
+        ["Edit"] = "Редактировать",
+        ["Game"] = "Игра",
+        ["Feedback"] = "Отклик",
+        ["Button sound"] = "Звук кнопок",
+        ["Visual click feedback"] = "Визуальный отклик на нажатие",
+        ["Theme editor"] = "Редактор тем",
+        ["Built-in themes"] = "Встроенные темы",
+        ["Apply theme"] = "Применить тему",
+        ["Custom theme"] = "Кастомная тема",
+        ["Background"] = "Фон",
+        ["Surface"] = "Поверхность",
+        ["Panel"] = "Панель",
+        ["Text"] = "Текст",
+        ["Muted text"] = "Приглушённый текст",
+        ["Primary"] = "Основной",
+        ["Secondary"] = "Вторичный",
+        ["Save custom theme"] = "Сохранить кастомную тему",
+        ["Delete custom theme"] = "Удалить кастомную тему",
+        ["Desktop library"] = "Библиотека ПК",
+        ["Choose action"] = "Выберите действие",
+        ["Search, filter, sort, and open game cards"] = "Поиск, фильтры, сортировка и карточки игр",
+        ["Choose how to add a game"] = "Выберите способ добавления игры",
+        ["Create or edit game metadata"] = "Создание или редактирование данных игры",
+        ["Import game metadata from store pages"] = "Импорт данных игры со страниц магазинов",
+        ["Cover, gallery, statuses, and notes"] = "Обложка, галерея, статусы и заметки",
+        ["JSON, ZIP, and Google Drive backups"] = "JSON, ZIP и резервные копии Google Диска",
+        ["Themes, language, feedback, and maintenance"] = "Темы, язык, отклик и обслуживание",
+        ["Built-in and custom color modes"] = "Встроенные и кастомные цветовые режимы",
+        ["Services, console families, and models"] = "Сервисы, семейства консолей и модели",
+        ["UnableSaveTheme"] = "Не удалось сохранить тему.",
+        ["UnableDeleteTheme"] = "Не удалось удалить тему.",
+        ["CustomThemeSaved"] = "Кастомная тема сохранена.",
+        ["CustomThemeDeleted"] = "Кастомная тема сброшена."
     };
 
     private static readonly IReadOnlyDictionary<string, string> EnglishText = new Dictionary<string, string>
@@ -1908,6 +2416,10 @@ public partial class MainWindow : Window
         ["DriveNotAuthenticatedStartup"] = "Google Drive is not authenticated yet. Use Connect account once, then future starts will connect automatically.",
         ["DriveNotAuthenticatedAction"] = "Google Drive is not authenticated yet. Use Connect account once before using Drive actions.",
         ["LanguageChanged"] = "Interface language changed.",
+        ["UnableSaveTheme"] = "Unable to save theme.",
+        ["UnableDeleteTheme"] = "Unable to delete theme.",
+        ["CustomThemeSaved"] = "Custom theme saved.",
+        ["CustomThemeDeleted"] = "Custom theme reset.",
         ["StatusCompleted"] = "Completed",
         ["StatusInProgress"] = "In progress",
         ["StatusPostponed"] = "Postponed",

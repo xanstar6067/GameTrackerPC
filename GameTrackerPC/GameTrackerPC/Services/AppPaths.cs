@@ -47,6 +47,14 @@ public static class AppSettingKeys
     public const string Theme = "theme";
     public const string Language = "language";
     public const string BackupFolder = "backupFolder";
+    public const string CustomThemeName = "customThemeName";
+    public const string CustomThemeBackground = "customThemeBackground";
+    public const string CustomThemeSurface = "customThemeSurface";
+    public const string CustomThemePanel = "customThemePanel";
+    public const string CustomThemeText = "customThemeText";
+    public const string CustomThemeMuted = "customThemeMuted";
+    public const string CustomThemePrimary = "customThemePrimary";
+    public const string CustomThemeSecondary = "customThemeSecondary";
 }
 
 public static class Clock

@@ -34,5 +34,9 @@ public enum LibraryViewMode
 public enum AppThemeMode
 {
     Light,
-    Dark
+    Dark,
+    Oled,
+    Cyberpunk,
+    HalfLife,
+    Custom
 }
