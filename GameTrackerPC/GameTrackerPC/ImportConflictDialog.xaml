@@ -8,7 +8,8 @@
         WindowStartupLocation="CenterOwner">
     <Border Padding="18">
         <StackPanel>
-            <TextBlock Text="Import conflict"
+            <TextBlock x:Name="DialogTitle"
+                       Text="Import conflict"
                        FontSize="18"
                        FontWeight="SemiBold"
                        Margin="0,0,0,10" />
@@ -27,7 +28,8 @@
                         BorderThickness="1"
                         CornerRadius="6">
                     <StackPanel>
-                        <TextBlock Text="Existing"
+                        <TextBlock x:Name="ExistingLabel"
+                                   Text="Existing"
                                    FontWeight="SemiBold" />
                         <TextBlock x:Name="ExistingText"
                                    TextWrapping="Wrap"
@@ -41,7 +43,8 @@
                         BorderThickness="1"
                         CornerRadius="6">
                     <StackPanel>
-                        <TextBlock Text="Incoming"
+                        <TextBlock x:Name="IncomingLabel"
+                                   Text="Incoming"
                                    FontWeight="SemiBold" />
                         <TextBlock x:Name="IncomingText"
                                    TextWrapping="Wrap"
@@ -50,19 +53,23 @@
                 </Border>
             </Grid>
             <UniformGrid Columns="4">
-                <Button Content="Replace"
+                <Button x:Name="ReplaceButton"
+                        Content="Replace"
                         Margin="0,0,6,0"
                         Padding="10,6"
                         Click="Replace_Click" />
-                <Button Content="Replace all"
+                <Button x:Name="ReplaceAllButton"
+                        Content="Replace all"
                         Margin="6,0"
                         Padding="10,6"
                         Click="ReplaceAll_Click" />
-                <Button Content="Skip"
+                <Button x:Name="SkipButton"
+                        Content="Skip"
                         Margin="6,0"
                         Padding="10,6"
                         Click="Skip_Click" />
-                <Button Content="Cancel"
+                <Button x:Name="CancelButton"
+                        Content="Cancel"
                         Margin="6,0,0,0"
                         Padding="10,6"
                         Click="Cancel_Click" />

@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using System.Windows.Media.Imaging;
 using GameTrackerPC.Data;
 using GameTrackerPC.Models;
@@ -25,10 +27,12 @@ public partial class MainWindow : Window
     private bool _driveAuthWarningShown;
     private bool _loading;
     private LibraryViewMode _viewMode = LibraryViewMode.List;
+    private string _language = RussianLanguage;
 
     public MainWindow()
     {
         InitializeComponent();
+        ApplyLanguage();
     }
 
     private GameVaultDbContext CreateDb() => new(AppPaths.DatabasePath);
@@ -49,32 +53,27 @@ public partial class MainWindow : Window
             await LoadReferencesAsync();
             await LoadGamesAsync();
             NewGame();
-            SetStatus("Ready");
+            SetStatus(T("Ready"));
             await TryAutoConnectDriveAsync();
         }
         catch (Exception ex)
         {
-            ShowError("Startup failed", ex);
+            ShowError(T("StartupFailed"), ex);
         }
     }
 
     private void ConfigureControls()
     {
         GamesList.ItemsSource = _gameItems;
-        StatusFilterBox.ItemsSource = new[] { "All" }.Concat(Enum.GetNames<GameStatus>()).ToList();
-        StatusFilterBox.SelectedIndex = 0;
-        SortBox.ItemsSource = new[]
-        {
-            "Title A-Z",
-            "Title Z-A",
-            "Status",
-            "Year",
-            "Created",
-            "Updated"
-        };
-        SortBox.SelectedIndex = 0;
-        PlatformBox.ItemsSource = Enum.GetValues<PlatformType>();
-        PlatformBox.SelectedItem = PlatformType.PC;
+        StatusFilterBox.DisplayMemberPath = nameof(UiOption<GameStatus?>.Text);
+        StatusFilterBox.SelectedValuePath = nameof(UiOption<GameStatus?>.Value);
+        SortBox.DisplayMemberPath = nameof(UiOption<SortMode>.Text);
+        SortBox.SelectedValuePath = nameof(UiOption<SortMode>.Value);
+        PlatformBox.DisplayMemberPath = nameof(UiOption<PlatformType>.Text);
+        PlatformBox.SelectedValuePath = nameof(UiOption<PlatformType>.Value);
+        LanguageBox.DisplayMemberPath = nameof(UiOption<string>.Text);
+        LanguageBox.SelectedValuePath = nameof(UiOption<string>.Value);
+        RefreshOptionControls();
         AutoAddSourceBox.ItemsSource = _autoAddService.SupportedSources;
         AutoAddSourceBox.SelectedItem = AutoAddSource.Steam;
         ImageScaleSlider.Value = 1;
@@ -84,6 +83,9 @@ public partial class MainWindow : Window
     {
         await using var db = CreateDb();
         BackupFolderBox.Text = await GetSettingAsync(db, AppSettingKeys.BackupFolder, AppPaths.DefaultBackupDirectory);
+
+        var language = await GetSettingAsync(db, AppSettingKeys.Language, RussianLanguage);
+        SetLanguage(language);
 
         var viewModeText = await GetSettingAsync(db, AppSettingKeys.ViewMode, LibraryViewMode.List.ToString());
         _viewMode = Enum.TryParse<LibraryViewMode>(viewModeText, out var viewMode) ? viewMode : LibraryViewMode.List;
@@ -154,20 +156,18 @@ public partial class MainWindow : Window
             query = query.Where(game => game.Title.Contains(search, StringComparison.CurrentCultureIgnoreCase));
         }
 
-        if (StatusFilterBox.SelectedItem is string statusText &&
-            !string.Equals(statusText, "All", StringComparison.Ordinal) &&
-            Enum.TryParse<GameStatus>(statusText, out var status))
+        if (StatusFilterBox.SelectedValue is GameStatus status)
         {
             query = query.Where(game => game.Statuses.Any(item => item.Status == status));
         }
 
-        query = SortBox.SelectedItem switch
+        query = SortBox.SelectedValue switch
         {
-            "Title Z-A" => query.OrderByDescending(game => game.Title),
-            "Status" => query.OrderBy(game => game.StatusText).ThenBy(game => game.Title),
-            "Year" => query.OrderByDescending(game => game.Year ?? 0).ThenBy(game => game.Title),
-            "Created" => query.OrderByDescending(game => game.CreatedAt),
-            "Updated" => query.OrderByDescending(game => game.UpdatedAt),
+            SortMode.TitleDescending => query.OrderByDescending(game => game.Title),
+            SortMode.Status => query.OrderBy(game => game.StatusText).ThenBy(game => game.Title),
+            SortMode.Year => query.OrderByDescending(game => game.Year ?? 0).ThenBy(game => game.Title),
+            SortMode.Created => query.OrderByDescending(game => game.CreatedAt),
+            SortMode.Updated => query.OrderByDescending(game => game.UpdatedAt),
             _ => query.OrderBy(game => game.Title)
         };
 
@@ -181,9 +181,9 @@ public partial class MainWindow : Window
                 Id = game.Id,
                 Title = game.Title,
                 Subtitle = BuildSubtitle(game, pcServices, consoleModels),
-                Statuses = game.StatusText,
+                Statuses = FormatStatuses(game.Statuses.Select(item => item.Status)),
                 YearText = game.Year?.ToString(CultureInfo.InvariantCulture) ?? "-",
-                UpdatedText = $"Updated {FormatTimestamp(game.UpdatedAt)}",
+                UpdatedText = string.Format(CultureInfo.CurrentCulture, T("UpdatedAt"), FormatTimestamp(game.UpdatedAt)),
                 ImagePath = File.Exists(game.ImageLocalPath) ? game.ImageLocalPath : null
             });
         }
@@ -194,12 +194,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string BuildSubtitle(
+    private string BuildSubtitle(
         Game game,
         IReadOnlyDictionary<string, string> pcServices,
         IReadOnlyDictionary<string, string> consoleModels)
     {
-        var platform = game.PlatformType.ToString();
+        var platform = PlatformName(game.PlatformType);
         var service = game.PlatformType == PlatformType.CONSOLE
             ? Lookup(consoleModels, game.ConsoleModelId)
             : Lookup(pcServices, game.PcServiceId);
@@ -217,7 +217,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunUiActionAsync("Unable to filter games.", () => LoadGamesAsync());
+        await RunUiActionAsync(T("UnableFilterGames"), () => LoadGamesAsync());
     }
 
     private async void GamesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -227,7 +227,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunUiActionAsync("Unable to load game.", () => LoadGameIntoEditorAsync(item.Id));
+        await RunUiActionAsync(T("UnableLoadGame"), () => LoadGameIntoEditorAsync(item.Id));
     }
 
     private async Task LoadGameIntoEditorAsync(string gameId)
@@ -245,7 +245,7 @@ public partial class MainWindow : Window
             IdBox.Text = game.Id;
             TitleBox.Text = game.Title;
             YearBox.Text = game.Year?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
-            PlatformBox.SelectedItem = game.PlatformType;
+            PlatformBox.SelectedValue = game.PlatformType;
             PcServiceBox.SelectedValue = game.PcServiceId;
             ConsoleModelBox.SelectedValue = game.ConsoleModelId;
             CoverUrlBox.Text = game.ImageSourceUrl ?? string.Empty;
@@ -280,7 +280,7 @@ public partial class MainWindow : Window
             IdBox.Text = Guid.NewGuid().ToString("N");
             TitleBox.Text = string.Empty;
             YearBox.Text = string.Empty;
-            PlatformBox.SelectedItem = PlatformType.PC;
+            PlatformBox.SelectedValue = PlatformType.PC;
             PcServiceBox.SelectedIndex = PcServiceBox.Items.Count > 0 ? 0 : -1;
             ConsoleModelBox.SelectedIndex = -1;
             CoverUrlBox.Text = string.Empty;
@@ -304,30 +304,30 @@ public partial class MainWindow : Window
 
     private async void SaveGameButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to save game.", async () =>
+        await RunUiActionAsync(T("UnableSaveGame"), async () =>
         {
             var id = await SaveCurrentGameAsync();
             await LoadGamesAsync(id);
-            SetStatus("Game saved.");
+            SetStatus(T("GameSaved"));
         });
     }
 
     private async void AutoAddButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to import game from store.", async () =>
+        await RunUiActionAsync(T("UnableImportStore"), async () =>
         {
             if (AutoAddSourceBox.SelectedItem is not AutoAddSource source)
             {
-                throw new InvalidOperationException("Choose a store first.");
+                throw new InvalidOperationException(T("ChooseStoreFirst"));
             }
 
             var reference = AutoAddReferenceBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(reference))
             {
-                throw new InvalidOperationException("Store link, slug, or AppID is required.");
+                throw new InvalidOperationException(T("StoreReferenceRequired"));
             }
 
-            SetStatus($"Importing from {AutoAddSourceName(source)}...");
+            SetStatus(string.Format(CultureInfo.CurrentCulture, T("ImportingFrom"), AutoAddSourceName(source)));
             var details = await _autoAddService.FetchGameDetailsAsync(new AutoAddRequest(source, reference));
             var result = await SaveImportedGameAsync(details);
 
@@ -340,8 +340,8 @@ public partial class MainWindow : Window
 
             AutoAddReferenceBox.Text = string.Empty;
             SetStatus(result.ImportedCount > 0
-                ? $"Imported {result.Title} from {AutoAddSourceName(source)}."
-                : $"Game already exists; updated imported images for {result.Title}.");
+                ? string.Format(CultureInfo.CurrentCulture, T("ImportedFrom"), result.Title, AutoAddSourceName(source))
+                : string.Format(CultureInfo.CurrentCulture, T("GameExistsImagesUpdated"), result.Title));
         });
     }
 
@@ -350,7 +350,7 @@ public partial class MainWindow : Window
         var title = TitleBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(title))
         {
-            throw new InvalidOperationException("Title is required.");
+            throw new InvalidOperationException(T("TitleRequired"));
         }
 
         int? year = null;
@@ -358,7 +358,7 @@ public partial class MainWindow : Window
         {
             if (!int.TryParse(YearBox.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsedYear))
             {
-                throw new InvalidOperationException("Year must be a number.");
+                throw new InvalidOperationException(T("YearMustBeNumber"));
             }
 
             year = parsedYear;
@@ -384,7 +384,7 @@ public partial class MainWindow : Window
 
         game.Title = title;
         game.Year = year;
-        game.PlatformType = PlatformBox.SelectedItem is PlatformType platform ? platform : PlatformType.PC;
+        game.PlatformType = PlatformBox.SelectedValue is PlatformType platform ? platform : PlatformType.PC;
         game.PcServiceId = game.PlatformType == PlatformType.CONSOLE ? null : PcServiceBox.SelectedValue as string;
         game.ConsoleModelId = game.PlatformType == PlatformType.CONSOLE ? ConsoleModelBox.SelectedValue as string : null;
         game.ConsoleFamilyId = await ResolveConsoleFamilyIdAsync(db, game.ConsoleModelId);
@@ -619,12 +619,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (MessageBox.Show(this, "Delete selected game?", "Confirm delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, T("DeleteSelectedGameQuestion"), T("ConfirmDelete"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             return;
         }
 
-        await RunUiActionAsync("Unable to delete game.", async () =>
+        await RunUiActionAsync(T("UnableDeleteGame"), async () =>
         {
             await using var db = CreateDb();
             var game = await db.Games.FindAsync(_currentGameId);
@@ -636,7 +636,7 @@ public partial class MainWindow : Window
 
             await LoadGamesAsync();
             NewGame();
-            SetStatus("Game deleted.");
+            SetStatus(T("GameDeleted"));
         });
     }
 
@@ -648,7 +648,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunUiActionAsync("Unable to add cover.", async () =>
+        await RunUiActionAsync(T("UnableAddCover"), async () =>
         {
             var copied = _imageService.CopyLocalImage(path);
             await UpdateCoverAsync(copied, Path.GetFileName(copied), null, ImageSourceType.GALLERY);
@@ -663,7 +663,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunUiActionAsync("Unable to download cover.", async () =>
+        await RunUiActionAsync(T("UnableDownloadCover"), async () =>
         {
             var downloaded = await _imageService.DownloadImageAsync(url);
             await UpdateCoverAsync(downloaded, Path.GetFileName(downloaded), url, ImageSourceType.DIRECT_IMAGE_URL);
@@ -672,14 +672,14 @@ public partial class MainWindow : Window
 
     private async void ReloadCoverButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to reload cover.", async () =>
+        await RunUiActionAsync(T("UnableReloadCover"), async () =>
         {
             var id = await EnsureSavedGameAsync();
             await using var db = CreateDb();
-            var game = await db.Games.FindAsync(id) ?? throw new InvalidOperationException("Game was not found.");
+            var game = await db.Games.FindAsync(id) ?? throw new InvalidOperationException(T("GameNotFound"));
             if (string.IsNullOrWhiteSpace(game.ImageSourceUrl))
             {
-                throw new InvalidOperationException("This cover does not have imageSourceUrl.");
+                throw new InvalidOperationException(T("CoverHasNoSourceUrl"));
             }
 
             var downloaded = await _imageService.DownloadImageAsync(game.ImageSourceUrl);
@@ -695,7 +695,7 @@ public partial class MainWindow : Window
     {
         var id = await EnsureSavedGameAsync();
         await using var db = CreateDb();
-        var game = await db.Games.FindAsync(id) ?? throw new InvalidOperationException("Game was not found.");
+        var game = await db.Games.FindAsync(id) ?? throw new InvalidOperationException(T("GameNotFound"));
         game.ImageLocalPath = localPath;
         game.ImageArchiveName = archiveName;
         game.ImageSourceUrl = sourceUrl ?? game.ImageSourceUrl;
@@ -714,7 +714,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunUiActionAsync("Unable to add gallery image.", async () =>
+        await RunUiActionAsync(T("UnableAddGalleryImage"), async () =>
         {
             var copied = _imageService.CopyLocalImage(path);
             await AddGalleryImageAsync(copied, Path.GetFileName(copied), null, ImageSourceType.GALLERY);
@@ -729,7 +729,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunUiActionAsync("Unable to download gallery image.", async () =>
+        await RunUiActionAsync(T("UnableDownloadGalleryImage"), async () =>
         {
             var downloaded = await _imageService.DownloadImageAsync(url);
             await AddGalleryImageAsync(downloaded, Path.GetFileName(downloaded), url, ImageSourceType.DIRECT_IMAGE_URL);
@@ -744,7 +744,7 @@ public partial class MainWindow : Window
         var count = await db.GameImages.CountAsync(image => image.GameId == id);
         if (count >= 20)
         {
-            throw new InvalidOperationException("Gallery limit is 20 images.");
+            throw new InvalidOperationException(T("GalleryLimit"));
         }
 
         db.GameImages.Add(new GameImage
@@ -783,7 +783,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunUiActionAsync("Unable to set gallery image as cover.", async () =>
+        await RunUiActionAsync(T("UnableSetGalleryCover"), async () =>
         {
             await UpdateCoverAsync(
                 image.LocalPath,
@@ -800,7 +800,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunUiActionAsync("Unable to remove gallery image.", async () =>
+        await RunUiActionAsync(T("UnableRemoveGalleryImage"), async () =>
         {
             await using var db = CreateDb();
             var stored = await db.GameImages.FindAsync(image.Id);
@@ -840,7 +840,7 @@ public partial class MainWindow : Window
         var familyId = NewModelFamilyBox.SelectedValue as string;
         if (string.IsNullOrWhiteSpace(familyId))
         {
-            MessageBox.Show(this, "Choose console family first.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, T("ChooseConsoleFamilyFirst"), T("Validation"), MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -859,19 +859,19 @@ public partial class MainWindow : Window
 
     private async Task AddReferenceAsync(System.Windows.Controls.TextBox sourceBox, Func<GameVaultDbContext, string, string, Task> add)
     {
-        await RunUiActionAsync("Unable to add reference.", async () =>
+        await RunUiActionAsync(T("UnableAddReference"), async () =>
         {
             var name = sourceBox.Text.Trim();
             if (string.IsNullOrWhiteSpace(name))
             {
-                throw new InvalidOperationException("Name is required.");
+                throw new InvalidOperationException(T("NameRequired"));
             }
 
             await using var db = CreateDb();
             await add(db, Slugify(name), name);
             sourceBox.Text = string.Empty;
             await LoadReferencesAsync();
-            SetStatus("Reference added.");
+            SetStatus(T("ReferenceAdded"));
         });
     }
 
@@ -879,7 +879,7 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFolderDialog
         {
-            Title = "Choose GameVault backup/export folder",
+            Title = T("ChooseBackupFolderTitle"),
             InitialDirectory = Directory.Exists(BackupFolderBox.Text) ? BackupFolderBox.Text : AppPaths.DefaultBackupDirectory
         };
 
@@ -894,27 +894,27 @@ public partial class MainWindow : Window
 
     private async void ExportJsonButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to export JSON.", async () =>
+        await RunUiActionAsync(T("UnableExportJson"), async () =>
         {
             var path = BuildLocalBackupPath("json");
             await _transferService.ExportJsonAsync(path);
-            SetStatus($"Exported JSON: {path}");
+            SetStatus(string.Format(CultureInfo.CurrentCulture, T("ExportedJson"), path));
         });
     }
 
     private async void ExportZipButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to export ZIP.", async () =>
+        await RunUiActionAsync(T("UnableExportZip"), async () =>
         {
             var path = BuildLocalBackupPath("zip");
             await _transferService.ExportZipAsync(path);
-            SetStatus($"Exported ZIP: {path}");
+            SetStatus(string.Format(CultureInfo.CurrentCulture, T("ExportedZip"), path));
         });
     }
 
     private async void ImportJsonButton_Click(object sender, RoutedEventArgs e)
     {
-        var path = PickOpenFile("GameVault JSON (*.json)|*.json|All files (*.*)|*.*");
+        var path = PickOpenFile(T("JsonFileFilter"));
         if (path is null)
         {
             return;
@@ -925,7 +925,7 @@ public partial class MainWindow : Window
 
     private async void ImportZipButton_Click(object sender, RoutedEventArgs e)
     {
-        var path = PickOpenFile("GameVault ZIP (*.zip)|*.zip|All files (*.*)|*.*");
+        var path = PickOpenFile(T("ZipFileFilter"));
         if (path is null)
         {
             return;
@@ -936,32 +936,32 @@ public partial class MainWindow : Window
 
     private async Task ImportFileAsync(string path, bool isZip)
     {
-        await RunUiActionAsync("Unable to import library.", async () =>
+        await RunUiActionAsync(T("UnableImportLibrary"), async () =>
         {
             var result = isZip
                 ? await _transferService.ImportZipAsync(path, ResolveImportConflict)
                 : await _transferService.ImportJsonAsync(path, ResolveImportConflict);
             await LoadReferencesAsync();
             await LoadGamesAsync();
-            SetStatus(result.Summary);
+            SetStatus(FormatImportSummary(result));
         });
     }
 
     private ImportConflictDecision ResolveImportConflict(ImportConflictInfo conflict)
     {
-        var dialog = new ImportConflictDialog(conflict) { Owner = this };
+        var dialog = new ImportConflictDialog(conflict, _language) { Owner = this };
         dialog.ShowDialog();
         return dialog.Decision;
     }
 
     private async void ClearImageCacheButton_Click(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this, "Clear all files from local image cache?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, T("ClearImageCacheQuestion"), T("Confirm"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             return;
         }
 
-        await RunUiActionAsync("Unable to clear image cache.", async () =>
+        await RunUiActionAsync(T("UnableClearImageCache"), async () =>
         {
             _imageService.ClearImageCache();
             await LoadGamesAsync(_currentGameId);
@@ -970,37 +970,37 @@ public partial class MainWindow : Window
                 await LoadGameIntoEditorAsync(_currentGameId);
             }
 
-            SetStatus("Image cache cleared.");
+            SetStatus(T("ImageCacheCleared"));
         });
     }
 
     private async void ClearLibraryButton_Click(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this, "Delete all local games? References and settings will be kept.", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, T("ClearLibraryQuestion"), T("Confirm"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             return;
         }
 
-        await RunUiActionAsync("Unable to clear library.", async () =>
+        await RunUiActionAsync(T("UnableClearLibrary"), async () =>
         {
             await using var db = CreateDb();
             db.Games.RemoveRange(db.Games);
             await db.SaveChangesAsync();
             await LoadGamesAsync();
             NewGame();
-            SetStatus("Local library cleared.");
+            SetStatus(T("LocalLibraryCleared"));
         });
     }
 
     private async void ConnectDriveButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to connect Google Drive.", async () =>
+        await RunUiActionAsync(T("UnableConnectDrive"), async () =>
         {
-            SetStatus("Opening browser sign-in...");
+            SetStatus(T("OpeningBrowserSignIn"));
             await _driveService.ConnectAsync();
             _driveAuthWarningShown = false;
             await RefreshDriveBackupsAsync();
-            SetStatus("Google Drive connected.");
+            SetStatus(T("DriveConnected"));
         });
     }
 
@@ -1010,17 +1010,17 @@ public partial class MainWindow : Window
         {
             _driveService.Disconnect();
             DriveBackupsGrid.ItemsSource = null;
-            SetStatus("Google Drive disconnected.");
+            SetStatus(T("DriveDisconnected"));
         }
         catch (Exception ex)
         {
-            ShowError("Unable to disconnect Google Drive.", ex);
+            ShowError(T("UnableDisconnectDrive"), ex);
         }
     }
 
     private async void UploadDriveBackupButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to upload backup.", async () =>
+        await RunUiActionAsync(T("UnableUploadBackup"), async () =>
         {
             if (!await EnsureDriveConnectedAsync())
             {
@@ -1031,13 +1031,13 @@ public partial class MainWindow : Window
             await _transferService.ExportZipAsync(path);
             await _driveService.UploadZipBackupAsync(path);
             await RefreshDriveBackupsAsync();
-            SetStatus("ZIP backup uploaded to root /GameVault.");
+            SetStatus(T("ZipUploadedDrive"));
         });
     }
 
     private async void AutoExportDriveBackupButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to auto export to Google Drive.", async () =>
+        await RunUiActionAsync(T("UnableAutoExportDrive"), async () =>
         {
             if (!await EnsureDriveConnectedAsync())
             {
@@ -1053,7 +1053,7 @@ public partial class MainWindow : Window
                 await _transferService.ExportZipAsync(tempPath);
                 await _driveService.UploadZipBackupAsync(tempPath);
                 await RefreshDriveBackupsAsync();
-                SetStatus("Temporary ZIP archive exported and uploaded to root /GameVault.");
+                SetStatus(T("TempZipUploadedDrive"));
             }
             finally
             {
@@ -1067,7 +1067,7 @@ public partial class MainWindow : Window
 
     private async void RefreshDriveBackupsButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to refresh backups.", async () =>
+        await RunUiActionAsync(T("UnableRefreshBackups"), async () =>
         {
             if (await EnsureDriveConnectedAsync())
             {
@@ -1080,7 +1080,7 @@ public partial class MainWindow : Window
     {
         var backups = await _driveService.ListBackupsAsync();
         DriveBackupsGrid.ItemsSource = backups;
-        SetStatus($"Loaded {backups.Count} Google Drive backup(s) from root /GameVault.");
+        SetStatus(string.Format(CultureInfo.CurrentCulture, T("LoadedDriveBackups"), backups.Count));
     }
 
     private async void RestoreSelectedDriveBackupButton_Click(object sender, RoutedEventArgs e)
@@ -1095,7 +1095,7 @@ public partial class MainWindow : Window
 
     private async void RestoreLatestDriveBackupButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync("Unable to restore latest backup.", async () =>
+        await RunUiActionAsync(T("UnableRestoreLatestBackup"), async () =>
         {
             if (!await EnsureDriveConnectedAsync())
             {
@@ -1105,7 +1105,7 @@ public partial class MainWindow : Window
             var backups = (await _driveService.ListBackupsAsync()).ToList();
             if (backups.Count == 0)
             {
-                throw new InvalidOperationException("No backups found in root /GameVault.");
+                throw new InvalidOperationException(T("NoDriveBackups"));
             }
 
             await RestoreDriveBackupCoreAsync(backups[0]);
@@ -1114,7 +1114,7 @@ public partial class MainWindow : Window
 
     private async Task RestoreDriveBackupAsync(DriveBackupFile backup)
     {
-        await RunUiActionAsync("Unable to restore backup.", async () =>
+        await RunUiActionAsync(T("UnableRestoreBackup"), async () =>
         {
             if (await EnsureDriveConnectedAsync())
             {
@@ -1130,7 +1130,7 @@ public partial class MainWindow : Window
         var result = await _transferService.ImportZipAsync(localPath, ResolveImportConflict);
         await LoadReferencesAsync();
         await LoadGamesAsync();
-        SetStatus(result.Summary);
+        SetStatus(FormatImportSummary(result));
     }
 
     private async void TrashDriveBackupButton_Click(object sender, RoutedEventArgs e)
@@ -1140,12 +1140,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (MessageBox.Show(this, $"Move '{backup.Name}' to Google Drive trash?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        if (MessageBox.Show(this, string.Format(CultureInfo.CurrentCulture, T("MoveBackupToTrashQuestion"), backup.Name), T("Confirm"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             return;
         }
 
-        await RunUiActionAsync("Unable to move backup to trash.", async () =>
+        await RunUiActionAsync(T("UnableMoveBackupTrash"), async () =>
         {
             if (!await EnsureDriveConnectedAsync())
             {
@@ -1154,7 +1154,7 @@ public partial class MainWindow : Window
 
             await _driveService.TrashBackupAsync(backup.Id);
             await RefreshDriveBackupsAsync();
-            SetStatus("Backup moved to Google Drive trash.");
+            SetStatus(T("BackupMovedTrash"));
         });
     }
 
@@ -1163,14 +1163,14 @@ public partial class MainWindow : Window
         if (await _driveService.TryConnectWithStoredTokenAsync())
         {
             await RefreshDriveBackupsAsync();
-            SetStatus("Google Drive connected automatically.");
+            SetStatus(T("DriveConnectedAutomatically"));
             return;
         }
 
         ShowDriveAuthWarningOnce(
             _driveService.HasStoredToken
-                ? "Google Drive token is missing, expired, or no longer valid. Use Connect account to sign in again."
-                : "Google Drive is not authenticated yet. Use Connect account once, then future starts will connect automatically.");
+                ? T("DriveTokenInvalid")
+                : T("DriveNotAuthenticatedStartup"));
     }
 
     private async Task<bool> EnsureDriveConnectedAsync()
@@ -1187,8 +1187,8 @@ public partial class MainWindow : Window
 
         ShowDriveAuthWarningOnce(
             _driveService.HasStoredToken
-                ? "Google Drive token is missing, expired, or no longer valid. Use Connect account to sign in again."
-                : "Google Drive is not authenticated yet. Use Connect account once before using Drive actions.");
+                ? T("DriveTokenInvalid")
+                : T("DriveNotAuthenticatedAction"));
         return false;
     }
 
@@ -1259,6 +1259,24 @@ public partial class MainWindow : Window
         await SetSettingAsync(db, AppSettingKeys.Theme, theme.ToString());
     }
 
+    private async void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading || LanguageBox.SelectedValue is not string language || string.Equals(language, _language, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        SetLanguage(language);
+        await using var db = CreateDb();
+        await SetSettingAsync(db, AppSettingKeys.Language, _language);
+        if (_transferService is not null)
+        {
+            await LoadGamesAsync(_currentGameId);
+        }
+
+        SetStatus(T("LanguageChanged"));
+    }
+
     private void ApplyTheme(AppThemeMode theme)
     {
         Background = theme == AppThemeMode.Dark
@@ -1273,7 +1291,7 @@ public partial class MainWindow : Window
 
     private void ApplyPlatformControls()
     {
-        if (PlatformBox.SelectedItem is not PlatformType platform)
+        if (PlatformBox.SelectedValue is not PlatformType platform)
         {
             return;
         }
@@ -1297,6 +1315,173 @@ public partial class MainWindow : Window
         ImageScaleText.Text = ImageScaleSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
         ImageOffsetXText.Text = ImageOffsetXSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
         ImageOffsetYText.Text = ImageOffsetYSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
+    }
+
+    private void SetLanguage(string language)
+    {
+        _language = string.Equals(language, EnglishLanguage, StringComparison.OrdinalIgnoreCase)
+            ? EnglishLanguage
+            : RussianLanguage;
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(_language == RussianLanguage ? "ru-RU" : "en-US");
+        RefreshOptionControls();
+        ApplyLanguage();
+    }
+
+    private void RefreshOptionControls()
+    {
+        var status = StatusFilterBox.SelectedValue as GameStatus?;
+        var sort = SortBox.SelectedValue is SortMode sortMode ? sortMode : SortMode.TitleAscending;
+        var platform = PlatformBox.SelectedValue is PlatformType platformType ? platformType : PlatformType.PC;
+        var language = string.IsNullOrWhiteSpace(_language) ? RussianLanguage : _language;
+
+        StatusFilterBox.ItemsSource = new UiOption<GameStatus?>[]
+        {
+            new(null, T("FilterAll")),
+            new(GameStatus.COMPLETED, StatusName(GameStatus.COMPLETED)),
+            new(GameStatus.IN_PROGRESS, StatusName(GameStatus.IN_PROGRESS)),
+            new(GameStatus.POSTPONED, StatusName(GameStatus.POSTPONED)),
+            new(GameStatus.DROPPED, StatusName(GameStatus.DROPPED)),
+            new(GameStatus.PLANNED, StatusName(GameStatus.PLANNED)),
+            new(GameStatus.NEVER_PLAY_AGAIN, StatusName(GameStatus.NEVER_PLAY_AGAIN))
+        };
+        StatusFilterBox.SelectedValue = status;
+        if (StatusFilterBox.SelectedIndex < 0)
+        {
+            StatusFilterBox.SelectedIndex = 0;
+        }
+
+        SortBox.ItemsSource = new UiOption<SortMode>[]
+        {
+            new(SortMode.TitleAscending, T("SortTitleAscending")),
+            new(SortMode.TitleDescending, T("SortTitleDescending")),
+            new(SortMode.Status, T("SortStatus")),
+            new(SortMode.Year, T("SortYear")),
+            new(SortMode.Created, T("SortCreated")),
+            new(SortMode.Updated, T("SortUpdated"))
+        };
+        SortBox.SelectedValue = sort;
+
+        PlatformBox.ItemsSource = new UiOption<PlatformType>[]
+        {
+            new(PlatformType.PC, PlatformName(PlatformType.PC)),
+            new(PlatformType.CONSOLE, PlatformName(PlatformType.CONSOLE)),
+            new(PlatformType.MOBILE, PlatformName(PlatformType.MOBILE))
+        };
+        PlatformBox.SelectedValue = platform;
+
+        LanguageBox.ItemsSource = new UiOption<string>[]
+        {
+            new(RussianLanguage, "Русский"),
+            new(EnglishLanguage, "English")
+        };
+        LanguageBox.SelectedValue = language;
+    }
+
+    private void ApplyLanguage()
+    {
+        Title = T("WindowTitle");
+        TranslateStaticText(this);
+        foreach (var column in DriveBackupsGrid.Columns)
+        {
+            if (column.Header is string text)
+            {
+                column.Header = TranslateLiteral(text);
+            }
+        }
+    }
+
+    private void TranslateStaticText(DependencyObject root)
+    {
+        switch (root)
+        {
+            case Button button when button.Content is string text:
+                button.Content = TranslateLiteral(text);
+                break;
+            case CheckBox checkBox when checkBox.Content is string text:
+                checkBox.Content = TranslateLiteral(text);
+                break;
+            case RadioButton radioButton when radioButton.Content is string text:
+                radioButton.Content = TranslateLiteral(text);
+                break;
+            case GroupBox groupBox when groupBox.Header is string text:
+                groupBox.Header = TranslateLiteral(text);
+                break;
+            case TabItem tabItem when tabItem.Header is string text:
+                tabItem.Header = TranslateLiteral(text);
+                break;
+            case TextBlock textBlock when BindingOperations.GetBindingExpression(textBlock, TextBlock.TextProperty) is null:
+                textBlock.Text = TranslateLiteral(textBlock.Text);
+                break;
+            case TextBox textBox when textBox.ToolTip is string text:
+                textBox.ToolTip = TranslateLiteral(text);
+                break;
+        }
+
+        if (root is Visual or Visual3D)
+        {
+            var childrenCount = VisualTreeHelper.GetChildrenCount(root);
+            for (var index = 0; index < childrenCount; index++)
+            {
+                TranslateStaticText(VisualTreeHelper.GetChild(root, index));
+            }
+        }
+
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            TranslateStaticText(child);
+        }
+    }
+
+    private string TranslateLiteral(string text)
+    {
+        if (StaticTextTranslations.TryGetValue(text, out var key))
+        {
+            return T(key);
+        }
+
+        return text;
+    }
+
+    private string FormatStatuses(IEnumerable<GameStatus> statuses)
+    {
+        var values = statuses.Distinct().ToList();
+        if (values.Count == 0)
+        {
+            values.Add(GameStatus.PLANNED);
+        }
+
+        return string.Join(", ", values.Select(StatusName));
+    }
+
+    private string FormatImportSummary(LibraryImportResult result)
+    {
+        var key = result.Cancelled ? "ImportCancelledSummary" : "ImportCompleteSummary";
+        return string.Format(CultureInfo.CurrentCulture, T(key), result.Added, result.Replaced, result.Skipped);
+    }
+
+    private string StatusName(GameStatus status) => status switch
+    {
+        GameStatus.COMPLETED => T("StatusCompleted"),
+        GameStatus.IN_PROGRESS => T("StatusInProgress"),
+        GameStatus.POSTPONED => T("StatusPostponed"),
+        GameStatus.DROPPED => T("StatusDropped"),
+        GameStatus.PLANNED => T("StatusPlanned"),
+        GameStatus.NEVER_PLAY_AGAIN => T("StatusNeverPlayAgain"),
+        _ => status.ToString()
+    };
+
+    private string PlatformName(PlatformType platform) => platform switch
+    {
+        PlatformType.PC => T("PlatformPc"),
+        PlatformType.CONSOLE => T("PlatformConsole"),
+        PlatformType.MOBILE => T("PlatformMobile"),
+        _ => platform.ToString()
+    };
+
+    private string T(string key)
+    {
+        var table = _language == EnglishLanguage ? EnglishText : RussianText;
+        return table.TryGetValue(key, out var value) ? value : key;
     }
 
     private async Task<string> EnsureSavedGameAsync()
@@ -1392,7 +1577,7 @@ public partial class MainWindow : Window
         return Path.Combine(folder, $"gamevault-library-{DateTime.Now:yyyyMMdd-HHmmss}.{extension}");
     }
 
-    private string? PickImageFile() => PickOpenFile("Images|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif|All files (*.*)|*.*");
+    private string? PickImageFile() => PickOpenFile(T("ImageFileFilter"));
 
     private string? PickOpenFile(string filter)
     {
@@ -1452,7 +1637,308 @@ public partial class MainWindow : Window
         return string.IsNullOrWhiteSpace(slug) ? Guid.NewGuid().ToString("N") : slug;
     }
 
+    private sealed record UiOption<T>(T Value, string Text);
     private sealed record AutoImportedImage(string LocalPath, string ArchiveName, string SourceUrl);
 
+    private enum SortMode
+    {
+        TitleAscending,
+        TitleDescending,
+        Status,
+        Year,
+        Created,
+        Updated
+    }
+
     private const int MaxAutoGalleryImages = 20;
+    private const string RussianLanguage = "ru";
+    private const string EnglishLanguage = "en";
+
+    private static readonly IReadOnlyDictionary<string, string> RussianText = new Dictionary<string, string>
+    {
+        ["WindowTitle"] = "GameVault Desktop",
+        ["Ready"] = "Готово",
+        ["StartupFailed"] = "Ошибка запуска",
+        ["FilterAll"] = "Все",
+        ["SortTitleAscending"] = "Название А-Я",
+        ["SortTitleDescending"] = "Название Я-А",
+        ["SortStatus"] = "Статус",
+        ["SortYear"] = "Год",
+        ["SortCreated"] = "Дата создания",
+        ["SortUpdated"] = "Дата изменения",
+        ["UpdatedAt"] = "Обновлено {0}",
+        ["UnableFilterGames"] = "Не удалось отфильтровать игры.",
+        ["UnableLoadGame"] = "Не удалось загрузить игру.",
+        ["UnableSaveGame"] = "Не удалось сохранить игру.",
+        ["GameSaved"] = "Игра сохранена.",
+        ["UnableImportStore"] = "Не удалось импортировать игру из магазина.",
+        ["ChooseStoreFirst"] = "Сначала выберите магазин.",
+        ["StoreReferenceRequired"] = "Укажите ссылку магазина, slug или AppID.",
+        ["ImportingFrom"] = "Импорт из {0}...",
+        ["ImportedFrom"] = "{0} импортирована из {1}.",
+        ["GameExistsImagesUpdated"] = "Игра уже существует; импортированные изображения обновлены для {0}.",
+        ["TitleRequired"] = "Название обязательно.",
+        ["YearMustBeNumber"] = "Год должен быть числом.",
+        ["DeleteSelectedGameQuestion"] = "Удалить выбранную игру?",
+        ["ConfirmDelete"] = "Подтверждение удаления",
+        ["Confirm"] = "Подтверждение",
+        ["UnableDeleteGame"] = "Не удалось удалить игру.",
+        ["GameDeleted"] = "Игра удалена.",
+        ["UnableAddCover"] = "Не удалось добавить обложку.",
+        ["UnableDownloadCover"] = "Не удалось скачать обложку.",
+        ["UnableReloadCover"] = "Не удалось перезагрузить обложку.",
+        ["GameNotFound"] = "Игра не найдена.",
+        ["CoverHasNoSourceUrl"] = "У этой обложки нет imageSourceUrl.",
+        ["UnableAddGalleryImage"] = "Не удалось добавить изображение в галерею.",
+        ["UnableDownloadGalleryImage"] = "Не удалось скачать изображение для галереи.",
+        ["GalleryLimit"] = "Лимит галереи: 20 изображений.",
+        ["UnableSetGalleryCover"] = "Не удалось сделать изображение галереи обложкой.",
+        ["UnableRemoveGalleryImage"] = "Не удалось удалить изображение из галереи.",
+        ["ChooseConsoleFamilyFirst"] = "Сначала выберите семейство консолей.",
+        ["Validation"] = "Проверка",
+        ["UnableAddReference"] = "Не удалось добавить справочник.",
+        ["NameRequired"] = "Название обязательно.",
+        ["ReferenceAdded"] = "Справочник добавлен.",
+        ["ChooseBackupFolderTitle"] = "Выберите папку резервных копий/экспорта GameVault",
+        ["UnableExportJson"] = "Не удалось экспортировать JSON.",
+        ["UnableExportZip"] = "Не удалось экспортировать ZIP.",
+        ["ExportedJson"] = "JSON экспортирован: {0}",
+        ["ExportedZip"] = "ZIP экспортирован: {0}",
+        ["JsonFileFilter"] = "GameVault JSON (*.json)|*.json|Все файлы (*.*)|*.*",
+        ["ZipFileFilter"] = "GameVault ZIP (*.zip)|*.zip|Все файлы (*.*)|*.*",
+        ["ImageFileFilter"] = "Изображения|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif|Все файлы (*.*)|*.*",
+        ["UnableImportLibrary"] = "Не удалось импортировать библиотеку.",
+        ["ImportCancelledSummary"] = "Импорт отменён. Добавлено: {0}, заменено: {1}, пропущено: {2}.",
+        ["ImportCompleteSummary"] = "Импорт завершён. Добавлено: {0}, заменено: {1}, пропущено: {2}.",
+        ["ClearImageCacheQuestion"] = "Очистить все файлы локального кэша изображений?",
+        ["UnableClearImageCache"] = "Не удалось очистить кэш изображений.",
+        ["ImageCacheCleared"] = "Кэш изображений очищен.",
+        ["ClearLibraryQuestion"] = "Удалить все локальные игры? Справочники и настройки будут сохранены.",
+        ["UnableClearLibrary"] = "Не удалось очистить библиотеку.",
+        ["LocalLibraryCleared"] = "Локальная библиотека очищена.",
+        ["UnableConnectDrive"] = "Не удалось подключить Google Диск.",
+        ["OpeningBrowserSignIn"] = "Открывается вход через браузер...",
+        ["DriveConnected"] = "Google Диск подключён.",
+        ["DriveDisconnected"] = "Google Диск отключён.",
+        ["UnableDisconnectDrive"] = "Не удалось отключить Google Диск.",
+        ["UnableUploadBackup"] = "Не удалось загрузить резервную копию.",
+        ["ZipUploadedDrive"] = "ZIP-копия загружена в корневую папку /GameVault.",
+        ["UnableAutoExportDrive"] = "Не удалось выполнить автоэкспорт в Google Диск.",
+        ["TempZipUploadedDrive"] = "Временный ZIP-архив экспортирован и загружен в корневую папку /GameVault.",
+        ["UnableRefreshBackups"] = "Не удалось обновить список резервных копий.",
+        ["LoadedDriveBackups"] = "Загружено резервных копий Google Диска из корневой папки /GameVault: {0}.",
+        ["UnableRestoreLatestBackup"] = "Не удалось восстановить последнюю резервную копию.",
+        ["NoDriveBackups"] = "В корневой папке /GameVault резервные копии не найдены.",
+        ["UnableRestoreBackup"] = "Не удалось восстановить резервную копию.",
+        ["MoveBackupToTrashQuestion"] = "Переместить «{0}» в корзину Google Диска?",
+        ["UnableMoveBackupTrash"] = "Не удалось переместить резервную копию в корзину.",
+        ["BackupMovedTrash"] = "Резервная копия перемещена в корзину Google Диска.",
+        ["DriveConnectedAutomatically"] = "Google Диск подключён автоматически.",
+        ["DriveTokenInvalid"] = "Токен Google Диска отсутствует, истёк или больше недействителен. Нажмите «Подключить аккаунт», чтобы войти снова.",
+        ["DriveNotAuthenticatedStartup"] = "Google Диск ещё не авторизован. Один раз нажмите «Подключить аккаунт», после этого будущие запуски будут подключаться автоматически.",
+        ["DriveNotAuthenticatedAction"] = "Google Диск ещё не авторизован. Сначала нажмите «Подключить аккаунт», чтобы использовать действия с Диском.",
+        ["LanguageChanged"] = "Язык интерфейса изменён.",
+        ["StatusCompleted"] = "Пройдено",
+        ["StatusInProgress"] = "В процессе",
+        ["StatusPostponed"] = "Отложено",
+        ["StatusDropped"] = "Брошено",
+        ["StatusPlanned"] = "Запланировано",
+        ["StatusNeverPlayAgain"] = "Больше не играть",
+        ["PlatformPc"] = "ПК",
+        ["PlatformConsole"] = "Консоль",
+        ["PlatformMobile"] = "Мобильная",
+        ["Search by title"] = "Поиск по названию",
+        ["List"] = "Список",
+        ["Tiles"] = "Плитка",
+        ["New"] = "Новая",
+        ["Game card"] = "Карточка игры",
+        ["Add cover"] = "Добавить обложку",
+        ["Reload URL"] = "Обновить по URL",
+        ["Image URL"] = "URL изображения",
+        ["Download cover URL"] = "Скачать обложку по URL",
+        ["Store import"] = "Импорт из магазина",
+        ["Steam AppID, store URL, or GOG/Epic slug"] = "Steam AppID, URL магазина или slug GOG/Epic",
+        ["Import"] = "Импорт",
+        ["Title"] = "Название",
+        ["Year"] = "Год",
+        ["Stable ID"] = "Стабильный ID",
+        ["Platform"] = "Платформа",
+        ["PC service"] = "ПК-сервис",
+        ["Console model"] = "Модель консоли",
+        ["Statuses"] = "Статусы",
+        ["COMPLETED"] = "ПРОЙДЕНО",
+        ["IN_PROGRESS"] = "В ПРОЦЕССЕ",
+        ["POSTPONED"] = "ОТЛОЖЕНО",
+        ["DROPPED"] = "БРОШЕНО",
+        ["PLANNED"] = "ЗАПЛАНИРОВАНО",
+        ["NEVER_PLAY_AGAIN"] = "БОЛЬШЕ НЕ ИГРАТЬ",
+        ["Cover crop"] = "Кадрирование обложки",
+        ["Scale"] = "Масштаб",
+        ["Offset X"] = "Сдвиг X",
+        ["Offset Y"] = "Сдвиг Y",
+        ["Source page URL"] = "URL страницы источника",
+        ["Notes"] = "Заметки",
+        ["Save"] = "Сохранить",
+        ["Delete"] = "Удалить",
+        ["Images"] = "Изображения",
+        ["Add local image"] = "Добавить локальное изображение",
+        ["Gallery image URL"] = "URL изображения галереи",
+        ["Download URL"] = "Скачать по URL",
+        ["Set as cover"] = "Сделать обложкой",
+        ["Remove"] = "Удалить",
+        ["References"] = "Справочники",
+        ["PC services"] = "ПК-сервисы",
+        ["Add service"] = "Добавить сервис",
+        ["Console families"] = "Семейства консолей",
+        ["Add family"] = "Добавить семейство",
+        ["Console models"] = "Модели консолей",
+        ["Add model"] = "Добавить модель",
+        ["Import / Export"] = "Импорт / экспорт",
+        ["Local backup/export folder"] = "Локальная папка резервных копий/экспорта",
+        ["Choose folder"] = "Выбрать папку",
+        ["Export"] = "Экспорт",
+        ["Export JSON"] = "Экспорт JSON",
+        ["Export ZIP with images"] = "Экспорт ZIP с изображениями",
+        ["Import JSON"] = "Импорт JSON",
+        ["Import ZIP"] = "Импорт ZIP",
+        ["Maintenance"] = "Обслуживание",
+        ["Clear image cache"] = "Очистить кэш изображений",
+        ["Clear library"] = "Очистить библиотеку",
+        ["Google Drive"] = "Google Диск",
+        ["Connect account"] = "Подключить аккаунт",
+        ["Disconnect"] = "Отключить",
+        ["Upload ZIP backup"] = "Загрузить ZIP-копию",
+        ["Auto export to Drive"] = "Автоэкспорт на Диск",
+        ["Refresh list"] = "Обновить список",
+        ["Restore selected"] = "Восстановить выбранную",
+        ["Restore latest"] = "Восстановить последнюю",
+        ["Move to trash"] = "В корзину",
+        ["Name"] = "Имя",
+        ["Created"] = "Создано",
+        ["Size"] = "Размер",
+        ["Only the root /GameVault folder is used."] = "Используется только корневая папка /GameVault.",
+        ["Settings"] = "Настройки",
+        ["Theme"] = "Тема",
+        ["Light"] = "Светлая",
+        ["Dark"] = "Тёмная",
+        ["Language"] = "Язык"
+    };
+
+    private static readonly IReadOnlyDictionary<string, string> EnglishText = new Dictionary<string, string>
+    {
+        ["WindowTitle"] = "GameVault Desktop",
+        ["Ready"] = "Ready",
+        ["StartupFailed"] = "Startup failed",
+        ["FilterAll"] = "All",
+        ["SortTitleAscending"] = "Title A-Z",
+        ["SortTitleDescending"] = "Title Z-A",
+        ["SortStatus"] = "Status",
+        ["SortYear"] = "Year",
+        ["SortCreated"] = "Created",
+        ["SortUpdated"] = "Updated",
+        ["UpdatedAt"] = "Updated {0}",
+        ["UnableFilterGames"] = "Unable to filter games.",
+        ["UnableLoadGame"] = "Unable to load game.",
+        ["UnableSaveGame"] = "Unable to save game.",
+        ["GameSaved"] = "Game saved.",
+        ["UnableImportStore"] = "Unable to import game from store.",
+        ["ChooseStoreFirst"] = "Choose a store first.",
+        ["StoreReferenceRequired"] = "Store link, slug, or AppID is required.",
+        ["ImportingFrom"] = "Importing from {0}...",
+        ["ImportedFrom"] = "Imported {0} from {1}.",
+        ["GameExistsImagesUpdated"] = "Game already exists; updated imported images for {0}.",
+        ["TitleRequired"] = "Title is required.",
+        ["YearMustBeNumber"] = "Year must be a number.",
+        ["DeleteSelectedGameQuestion"] = "Delete selected game?",
+        ["ConfirmDelete"] = "Confirm delete",
+        ["Confirm"] = "Confirm",
+        ["UnableDeleteGame"] = "Unable to delete game.",
+        ["GameDeleted"] = "Game deleted.",
+        ["UnableAddCover"] = "Unable to add cover.",
+        ["UnableDownloadCover"] = "Unable to download cover.",
+        ["UnableReloadCover"] = "Unable to reload cover.",
+        ["GameNotFound"] = "Game was not found.",
+        ["CoverHasNoSourceUrl"] = "This cover does not have imageSourceUrl.",
+        ["UnableAddGalleryImage"] = "Unable to add gallery image.",
+        ["UnableDownloadGalleryImage"] = "Unable to download gallery image.",
+        ["GalleryLimit"] = "Gallery limit is 20 images.",
+        ["UnableSetGalleryCover"] = "Unable to set gallery image as cover.",
+        ["UnableRemoveGalleryImage"] = "Unable to remove gallery image.",
+        ["ChooseConsoleFamilyFirst"] = "Choose console family first.",
+        ["Validation"] = "Validation",
+        ["UnableAddReference"] = "Unable to add reference.",
+        ["NameRequired"] = "Name is required.",
+        ["ReferenceAdded"] = "Reference added.",
+        ["ChooseBackupFolderTitle"] = "Choose GameVault backup/export folder",
+        ["UnableExportJson"] = "Unable to export JSON.",
+        ["UnableExportZip"] = "Unable to export ZIP.",
+        ["ExportedJson"] = "Exported JSON: {0}",
+        ["ExportedZip"] = "Exported ZIP: {0}",
+        ["JsonFileFilter"] = "GameVault JSON (*.json)|*.json|All files (*.*)|*.*",
+        ["ZipFileFilter"] = "GameVault ZIP (*.zip)|*.zip|All files (*.*)|*.*",
+        ["ImageFileFilter"] = "Images|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif|All files (*.*)|*.*",
+        ["UnableImportLibrary"] = "Unable to import library.",
+        ["ImportCancelledSummary"] = "Import cancelled. Added: {0}, replaced: {1}, skipped: {2}.",
+        ["ImportCompleteSummary"] = "Import complete. Added: {0}, replaced: {1}, skipped: {2}.",
+        ["ClearImageCacheQuestion"] = "Clear all files from local image cache?",
+        ["UnableClearImageCache"] = "Unable to clear image cache.",
+        ["ImageCacheCleared"] = "Image cache cleared.",
+        ["ClearLibraryQuestion"] = "Delete all local games? References and settings will be kept.",
+        ["UnableClearLibrary"] = "Unable to clear library.",
+        ["LocalLibraryCleared"] = "Local library cleared.",
+        ["UnableConnectDrive"] = "Unable to connect Google Drive.",
+        ["OpeningBrowserSignIn"] = "Opening browser sign-in...",
+        ["DriveConnected"] = "Google Drive connected.",
+        ["DriveDisconnected"] = "Google Drive disconnected.",
+        ["UnableDisconnectDrive"] = "Unable to disconnect Google Drive.",
+        ["UnableUploadBackup"] = "Unable to upload backup.",
+        ["ZipUploadedDrive"] = "ZIP backup uploaded to root /GameVault.",
+        ["UnableAutoExportDrive"] = "Unable to auto export to Google Drive.",
+        ["TempZipUploadedDrive"] = "Temporary ZIP archive exported and uploaded to root /GameVault.",
+        ["UnableRefreshBackups"] = "Unable to refresh backups.",
+        ["LoadedDriveBackups"] = "Loaded {0} Google Drive backup(s) from root /GameVault.",
+        ["UnableRestoreLatestBackup"] = "Unable to restore latest backup.",
+        ["NoDriveBackups"] = "No backups found in root /GameVault.",
+        ["UnableRestoreBackup"] = "Unable to restore backup.",
+        ["MoveBackupToTrashQuestion"] = "Move '{0}' to Google Drive trash?",
+        ["UnableMoveBackupTrash"] = "Unable to move backup to trash.",
+        ["BackupMovedTrash"] = "Backup moved to Google Drive trash.",
+        ["DriveConnectedAutomatically"] = "Google Drive connected automatically.",
+        ["DriveTokenInvalid"] = "Google Drive token is missing, expired, or no longer valid. Use Connect account to sign in again.",
+        ["DriveNotAuthenticatedStartup"] = "Google Drive is not authenticated yet. Use Connect account once, then future starts will connect automatically.",
+        ["DriveNotAuthenticatedAction"] = "Google Drive is not authenticated yet. Use Connect account once before using Drive actions.",
+        ["LanguageChanged"] = "Interface language changed.",
+        ["StatusCompleted"] = "Completed",
+        ["StatusInProgress"] = "In progress",
+        ["StatusPostponed"] = "Postponed",
+        ["StatusDropped"] = "Dropped",
+        ["StatusPlanned"] = "Planned",
+        ["StatusNeverPlayAgain"] = "Never play again",
+        ["PlatformPc"] = "PC",
+        ["PlatformConsole"] = "Console",
+        ["PlatformMobile"] = "Mobile"
+    };
+
+    private static readonly IReadOnlyDictionary<string, string> StaticTextTranslations = BuildStaticTextTranslations();
+
+    private static IReadOnlyDictionary<string, string> BuildStaticTextTranslations()
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in RussianText)
+        {
+            values[value] = key;
+        }
+
+        foreach (var (key, value) in RussianText)
+        {
+            if (EnglishText.TryGetValue(key, out var english))
+            {
+                values[english] = key;
+            }
+
+            values[key] = key;
+        }
+
+        return values;
+    }
 }

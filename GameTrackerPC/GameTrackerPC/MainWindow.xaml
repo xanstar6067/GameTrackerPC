@@ -571,6 +571,12 @@
                                              Checked="ThemeButton_Checked" />
                             </StackPanel>
                         </GroupBox>
+                        <GroupBox Header="Language">
+                            <ComboBox x:Name="LanguageBox"
+                                      Width="220"
+                                      HorizontalAlignment="Left"
+                                      SelectionChanged="LanguageBox_SelectionChanged" />
+                        </GroupBox>
                     </StackPanel>
                 </TabItem>
             </TabControl>

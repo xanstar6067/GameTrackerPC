@@ -17,6 +17,7 @@ public static class DatabaseInitializer
             db.AppSettings.AddRange(
                 new AppSetting { Key = AppSettingKeys.ViewMode, Value = LibraryViewMode.List.ToString() },
                 new AppSetting { Key = AppSettingKeys.Theme, Value = AppThemeMode.Light.ToString() },
+                new AppSetting { Key = AppSettingKeys.Language, Value = "ru" },
                 new AppSetting { Key = AppSettingKeys.BackupFolder, Value = AppPaths.DefaultBackupDirectory });
         }
 
