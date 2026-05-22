@@ -1441,10 +1441,15 @@ public partial class MainWindow : Window
         TilesModeButton.FontWeight = _viewMode == LibraryViewMode.Tiles ? FontWeights.SemiBold : FontWeights.Normal;
     }
 
-    private static Style CreateGameItemStyle(LibraryViewMode mode)
+    private Style CreateGameItemStyle(LibraryViewMode mode)
     {
-        var style = new Style(typeof(ListBoxItem));
+        var baseStyle = TryFindResource(typeof(ListBoxItem)) as Style;
+        var style = baseStyle is null
+            ? new Style(typeof(ListBoxItem))
+            : new Style(typeof(ListBoxItem), baseStyle);
         style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("TextBrush")));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         if (mode == LibraryViewMode.Tiles)
         {
             style.Setters.Add(new Setter(FrameworkElement.WidthProperty, 250d));
