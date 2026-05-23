@@ -493,7 +493,7 @@ public partial class MainWindow : Window
 
     private string ScreenTitle(AppScreen screen) => screen switch
     {
-        AppScreen.Start => "GAMEVAULT",
+        AppScreen.Start => "RELIQUARY",
         AppScreen.Menu => T("Menu"),
         AppScreen.Database => T("Database"),
         AppScreen.AddMode => T("New record"),
@@ -504,7 +504,7 @@ public partial class MainWindow : Window
         AppScreen.Settings => T("Settings"),
         AppScreen.ThemeEditor => T("Theme editor"),
         AppScreen.References => T("References"),
-        _ => "GAMEVAULT"
+        _ => "RELIQUARY"
     };
 
     private string ScreenSubtitle(AppScreen screen) => screen switch
@@ -1392,10 +1392,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        ShowDriveAuthWarningOnce(
-            _driveService.HasStoredToken
-                ? T("DriveTokenInvalid")
-                : T("DriveNotAuthenticatedStartup"));
+        if (_driveService.HasStoredToken)
+        {
+            ShowDriveAuthWarningOnce(T("DriveTokenInvalid"));
+        }
     }
 
     private async Task<bool> EnsureDriveConnectedAsync()
@@ -1463,6 +1463,7 @@ public partial class MainWindow : Window
         Resources["GameCardUpdatedMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
         Resources["GameCardCoverWidth"] = 58 * _cardScale;
         Resources["GameCardCoverHeight"] = 78 * _cardScale;
+        Resources["GameCardHeight"] = 98 * _cardScale;
         Resources["GameCardTitleFontSize"] = 15 * _cardScale;
         Resources["GameCardSmallFontSize"] = 11 * _cardScale;
 
@@ -1793,6 +1794,7 @@ public partial class MainWindow : Window
     private void CropSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         UpdateCropText();
+        ApplyCoverCrop();
     }
 
     private void UpdateCropText()
@@ -1805,6 +1807,35 @@ public partial class MainWindow : Window
         ImageScaleText.Text = ImageScaleSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
         ImageOffsetXText.Text = ImageOffsetXSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
         ImageOffsetYText.Text = ImageOffsetYSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
+    }
+
+    private void CoverFrame_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ApplyCoverCrop();
+    }
+
+    private void ApplyCoverCrop()
+    {
+        if (CoverPreview is null || DetailsCoverPreview is null || ImageScaleSlider is null)
+        {
+            return;
+        }
+
+        var scale = Clamp(ImageScaleSlider.Value, 1, 4);
+        var offsetX = Clamp(ImageOffsetXSlider.Value, -2, 2);
+        var offsetY = Clamp(ImageOffsetYSlider.Value, -2, 2);
+        ApplyCoverTransform(CoverPreview, scale, offsetX, offsetY);
+        ApplyCoverTransform(DetailsCoverPreview, scale, offsetX, offsetY);
+    }
+
+    private static void ApplyCoverTransform(Image image, double scale, double offsetX, double offsetY)
+    {
+        var width = image.ActualWidth <= 0 ? 1 : image.ActualWidth;
+        var height = image.ActualHeight <= 0 ? 1 : image.ActualHeight;
+        var transform = new TransformGroup();
+        transform.Children.Add(new ScaleTransform(scale, scale));
+        transform.Children.Add(new TranslateTransform(offsetX * width * 0.18, offsetY * height * 0.18));
+        image.RenderTransform = transform;
     }
 
     private void SetLanguage(string language)
@@ -2025,6 +2056,7 @@ public partial class MainWindow : Window
         var bitmap = LoadBitmap(path);
         CoverPreview.Source = bitmap;
         DetailsCoverPreview.Source = bitmap;
+        ApplyCoverCrop();
     }
 
     private static BitmapImage? LoadBitmap(string? path)
@@ -2175,14 +2207,14 @@ public partial class MainWindow : Window
 
     private const int MaxAutoGalleryImages = 20;
     private const double MinCardScale = 0.75;
-    private const double MaxCardScale = 1.6;
+    private const double MaxCardScale = 4;
     private const double DefaultCardScale = 1.0;
     private const string RussianLanguage = "ru";
     private const string EnglishLanguage = "en";
 
     private static readonly IReadOnlyDictionary<string, string> RussianText = new Dictionary<string, string>
     {
-        ["WindowTitle"] = "GameVault Desktop",
+        ["WindowTitle"] = "Reliquary",
         ["Ready"] = "Готово",
         ["StartupFailed"] = "Ошибка запуска",
         ["FilterAll"] = "Все",
@@ -2400,7 +2432,7 @@ public partial class MainWindow : Window
 
     private static readonly IReadOnlyDictionary<string, string> EnglishText = new Dictionary<string, string>
     {
-        ["WindowTitle"] = "GameVault Desktop",
+        ["WindowTitle"] = "Reliquary",
         ["Ready"] = "Ready",
         ["StartupFailed"] = "Startup failed",
         ["FilterAll"] = "All",
