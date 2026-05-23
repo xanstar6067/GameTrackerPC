@@ -106,6 +106,22 @@
             <Setter Property="Foreground" Value="White" />
         </Style>
 
+        <Style x:Key="HeaderButton" TargetType="{x:Type Button}" BasedOn="{StaticResource CyberButton}">
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="HeaderSecondaryButton" TargetType="{x:Type Button}" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+        </Style>
+
         <Style TargetType="{x:Type TextBox}">
             <Setter Property="MinHeight" Value="36" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -158,6 +174,12 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="HeaderTextBox" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Margin" Value="0" />
         </Style>
 
         <Style TargetType="{x:Type ComboBox}">
@@ -233,6 +255,12 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="HeaderComboBox" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Margin" Value="0" />
         </Style>
 
         <Style TargetType="{x:Type ComboBoxItem}">
@@ -580,49 +608,68 @@
                 </Grid.RowDefinitions>
                 <Border Style="{StaticResource CyberPanel}">
                     <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="36" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="2*" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0"
-                                    Margin="0,0,12,0">
-                            <TextBlock Text="Search by title"
-                                       Style="{StaticResource LabelText}" />
-                            <TextBox x:Name="SearchBox"
-                                     TextChanged="Filter_Changed"
-                                     ToolTip="Search by title" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1"
-                                    Margin="0,0,12,0">
-                            <TextBlock Text="Statuses"
-                                       Style="{StaticResource LabelText}" />
-                            <ComboBox x:Name="StatusFilterBox"
-                                      SelectionChanged="Filter_Changed" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2"
-                                    Margin="0,0,12,0">
-                            <TextBlock Text="Sort"
-                                       Style="{StaticResource LabelText}" />
-                            <ComboBox x:Name="SortBox"
-                                      SelectionChanged="Filter_Changed" />
-                        </StackPanel>
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="0"
+                                   Margin="0,0,12,4"
+                                   Text="Search by title"
+                                   Style="{StaticResource LabelText}" />
+                        <TextBox x:Name="SearchBox"
+                                 Grid.Row="1"
+                                 Grid.Column="0"
+                                 Margin="0,0,12,0"
+                                 Style="{StaticResource HeaderTextBox}"
+                                 TextChanged="Filter_Changed"
+                                 ToolTip="Search by title" />
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="1"
+                                   Margin="0,0,12,4"
+                                   Text="Statuses"
+                                   Style="{StaticResource LabelText}" />
+                        <ComboBox x:Name="StatusFilterBox"
+                                  Grid.Row="1"
+                                  Grid.Column="1"
+                                  Margin="0,0,12,0"
+                                  Style="{StaticResource HeaderComboBox}"
+                                  SelectionChanged="Filter_Changed" />
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="2"
+                                   Margin="0,0,12,4"
+                                   Text="Sort"
+                                   Style="{StaticResource LabelText}" />
+                        <ComboBox x:Name="SortBox"
+                                  Grid.Row="1"
+                                  Grid.Column="2"
+                                  Margin="0,0,12,0"
+                                  Style="{StaticResource HeaderComboBox}"
+                                  SelectionChanged="Filter_Changed" />
                         <StackPanel Grid.Column="3"
+                                    Grid.Row="1"
                                     Orientation="Horizontal"
-                                    VerticalAlignment="Bottom">
+                                    VerticalAlignment="Stretch">
                             <Button x:Name="ListModeButton"
                                     Content="List"
-                                    Style="{StaticResource SecondaryButton}"
+                                    Style="{StaticResource HeaderSecondaryButton}"
                                     Click="ListModeButton_Click" />
                             <Button x:Name="TilesModeButton"
                                     Content="Tiles"
-                                    Style="{StaticResource SecondaryButton}"
+                                    Style="{StaticResource HeaderSecondaryButton}"
                                     Click="TilesModeButton_Click" />
                             <Button Content="Import / Export"
-                                    Style="{StaticResource SecondaryButton}"
+                                    Style="{StaticResource HeaderSecondaryButton}"
                                     Click="OpenImportExportButton_Click" />
                             <Button Content="New"
+                                    Margin="0"
+                                    Style="{StaticResource HeaderButton}"
                                     Click="NewGameButton_Click" />
                         </StackPanel>
                     </Grid>
