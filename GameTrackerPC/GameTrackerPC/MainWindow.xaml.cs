@@ -31,7 +31,9 @@ public partial class MainWindow : Window
     private bool _loading;
     private bool _updatingThemeControls;
     private bool _suppressGameSelectionNavigation;
+    private bool _suppressCardScaleSave;
     private LibraryViewMode _viewMode = LibraryViewMode.List;
+    private double _cardScale = DefaultCardScale;
     private string _language = RussianLanguage;
     private AppThemeMode _currentTheme = AppThemeMode.Light;
     private AppScreen _currentScreen = AppScreen.Start;
@@ -93,6 +95,7 @@ public partial class MainWindow : Window
         AutoAddSourceBox.ItemsSource = _autoAddService.SupportedSources;
         AutoAddSourceBox.SelectedItem = AutoAddSource.Steam;
         ImageScaleSlider.Value = 1;
+        ApplyCardScale(_cardScale);
         ShowScreen(AppScreen.Start, animate: false);
     }
 
@@ -106,6 +109,14 @@ public partial class MainWindow : Window
 
         var viewModeText = await GetSettingAsync(db, AppSettingKeys.ViewMode, LibraryViewMode.List.ToString());
         _viewMode = Enum.TryParse<LibraryViewMode>(viewModeText, out var viewMode) ? viewMode : LibraryViewMode.List;
+        var cardScaleText = await GetSettingAsync(db, AppSettingKeys.CardScale, DefaultCardScale.ToString(CultureInfo.InvariantCulture));
+        _cardScale = double.TryParse(cardScaleText, NumberStyles.Float, CultureInfo.InvariantCulture, out var cardScale)
+            ? Clamp(cardScale, MinCardScale, MaxCardScale)
+            : DefaultCardScale;
+        _suppressCardScaleSave = true;
+        CardScaleSlider.Value = _cardScale;
+        ApplyCardScale(_cardScale);
+        _suppressCardScaleSave = false;
         ApplyViewMode();
 
         await LoadCustomThemeAsync(db);
@@ -1441,6 +1452,47 @@ public partial class MainWindow : Window
         TilesModeButton.FontWeight = _viewMode == LibraryViewMode.Tiles ? FontWeights.SemiBold : FontWeights.Normal;
     }
 
+    private void ApplyCardScale(double scale)
+    {
+        _cardScale = Clamp(scale, MinCardScale, MaxCardScale);
+        Resources["GameCardPadding"] = new Thickness(10 * _cardScale);
+        Resources["GameCardMargin"] = new Thickness(0, 0, 0, 10 * _cardScale);
+        Resources["GameCardContentMargin"] = new Thickness(12 * _cardScale, 0, 0, 0);
+        Resources["GameCardSubtitleMargin"] = new Thickness(0, 4 * _cardScale, 0, 0);
+        Resources["GameCardChipMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
+        Resources["GameCardUpdatedMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
+        Resources["GameCardCoverWidth"] = 58 * _cardScale;
+        Resources["GameCardCoverHeight"] = 78 * _cardScale;
+        Resources["GameCardTitleFontSize"] = 15 * _cardScale;
+        Resources["GameCardSmallFontSize"] = 11 * _cardScale;
+
+        if (CardScaleValueText is not null)
+        {
+            CardScaleValueText.Text = $"{Math.Round(_cardScale * 100, MidpointRounding.AwayFromZero):0}%";
+        }
+
+        if (GamesList is not null)
+        {
+            GamesList.ItemContainerStyle = CreateGameItemStyle(_viewMode);
+        }
+    }
+
+    private async void CardScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (CardScaleValueText is null)
+        {
+            return;
+        }
+
+        ApplyCardScale(e.NewValue);
+        if (_suppressCardScaleSave)
+        {
+            return;
+        }
+
+        await SaveCardScaleAsync();
+    }
+
     private Style CreateGameItemStyle(LibraryViewMode mode)
     {
         var baseStyle = TryFindResource(typeof(ListBoxItem)) as Style;
@@ -1452,8 +1504,8 @@ public partial class MainWindow : Window
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         if (mode == LibraryViewMode.Tiles)
         {
-            style.Setters.Add(new Setter(FrameworkElement.WidthProperty, 250d));
-            style.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 0, 10, 10)));
+            style.Setters.Add(new Setter(FrameworkElement.WidthProperty, 250d * _cardScale));
+            style.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 0, 10 * _cardScale, 10 * _cardScale)));
         }
 
         return style;
@@ -1463,6 +1515,12 @@ public partial class MainWindow : Window
     {
         await using var db = CreateDb();
         await SetSettingAsync(db, AppSettingKeys.ViewMode, _viewMode.ToString());
+    }
+
+    private async Task SaveCardScaleAsync()
+    {
+        await using var db = CreateDb();
+        await SetSettingAsync(db, AppSettingKeys.CardScale, _cardScale.ToString(CultureInfo.InvariantCulture));
     }
 
     private async void ThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2116,6 +2174,9 @@ public partial class MainWindow : Window
     }
 
     private const int MaxAutoGalleryImages = 20;
+    private const double MinCardScale = 0.75;
+    private const double MaxCardScale = 1.6;
+    private const double DefaultCardScale = 1.0;
     private const string RussianLanguage = "ru";
     private const string EnglishLanguage = "en";
 

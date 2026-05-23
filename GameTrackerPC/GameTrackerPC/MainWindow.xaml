@@ -429,16 +429,16 @@
         <DataTemplate x:Key="GameCardTemplate" DataType="{x:Type models:GameListItem}">
             <Border BorderBrush="{DynamicResource BorderBrushSoft}"
                     BorderThickness="1"
-                    Padding="10"
-                    Margin="0,0,0,10"
+                    Padding="{DynamicResource GameCardPadding}"
+                    Margin="{DynamicResource GameCardMargin}"
                     Background="{DynamicResource SurfaceBrush}">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="70" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Border Width="58"
-                            Height="78"
+                    <Border Width="{DynamicResource GameCardCoverWidth}"
+                            Height="{DynamicResource GameCardCoverHeight}"
                             Background="{DynamicResource SurfaceAltBrush}"
                             BorderBrush="{DynamicResource BorderBrushSoft}"
                             BorderThickness="1"
@@ -447,28 +447,29 @@
                                Stretch="UniformToFill" />
                     </Border>
                     <StackPanel Grid.Column="1"
-                                Margin="12,0,0,0">
+                                Margin="{DynamicResource GameCardContentMargin}">
                         <TextBlock Text="{Binding Title}"
                                    FontWeight="Bold"
-                                   FontSize="15"
+                                   FontSize="{DynamicResource GameCardTitleFontSize}"
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding Subtitle}"
                                    Style="{StaticResource MutedText}"
-                                   Margin="0,4,0,0"
+                                   FontSize="{DynamicResource GameCardSmallFontSize}"
+                                   Margin="{DynamicResource GameCardSubtitleMargin}"
                                    TextTrimming="CharacterEllipsis" />
                         <Border Style="{StaticResource CyberChip}"
                                 HorizontalAlignment="Left"
-                                Margin="0,8,0,0">
+                                Margin="{DynamicResource GameCardChipMargin}">
                             <TextBlock Text="{Binding Statuses}"
                                        Foreground="{DynamicResource PrimaryBrush}"
-                                       FontSize="11"
+                                       FontSize="{DynamicResource GameCardSmallFontSize}"
                                        FontFamily="Consolas, Cascadia Mono, Segoe UI"
                                        TextWrapping="Wrap" />
                         </Border>
                         <TextBlock Text="{Binding UpdatedText}"
                                    Foreground="{DynamicResource MutedTextBrush}"
-                                   FontSize="11"
-                                   Margin="0,8,0,0" />
+                                   FontSize="{DynamicResource GameCardSmallFontSize}"
+                                   Margin="{DynamicResource GameCardUpdatedMargin}" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -674,13 +675,51 @@
                         </StackPanel>
                     </Grid>
                 </Border>
-                <ListBox x:Name="GamesList"
-                         Grid.Row="1"
-                         ItemTemplate="{StaticResource GameCardTemplate}"
-                         ItemsPanel="{StaticResource ListPanelTemplate}"
-                         BorderThickness="0"
-                         SelectionChanged="GamesList_SelectionChanged"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                <Grid Grid.Row="1">
+                    <ListBox x:Name="GamesList"
+                             ItemTemplate="{StaticResource GameCardTemplate}"
+                             ItemsPanel="{StaticResource ListPanelTemplate}"
+                             BorderThickness="0"
+                             Padding="0,0,56,0"
+                             SelectionChanged="GamesList_SelectionChanged"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                    <Border HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Width="44"
+                            Height="188"
+                            Margin="0,0,8,12"
+                            Padding="8"
+                            Background="{DynamicResource PanelBrush}"
+                            BorderBrush="{DynamicResource BorderBrushSoft}"
+                            BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="+"
+                                       HorizontalAlignment="Center"
+                                       FontSize="14"
+                                       Style="{StaticResource MutedText}" />
+                            <Slider x:Name="CardScaleSlider"
+                                    Grid.Row="1"
+                                    Minimum="0.75"
+                                    Maximum="1.6"
+                                    Value="1"
+                                    TickFrequency="0.05"
+                                    IsSnapToTickEnabled="True"
+                                    Orientation="Vertical"
+                                    ToolTip="Scale"
+                                    ValueChanged="CardScaleSlider_ValueChanged" />
+                            <TextBlock x:Name="CardScaleValueText"
+                                       Grid.Row="2"
+                                       HorizontalAlignment="Center"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource MutedTextBrush}" />
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
 
             <Grid x:Name="AddModeScreen"
