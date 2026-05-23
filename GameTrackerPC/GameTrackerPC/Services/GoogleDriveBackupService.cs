@@ -3,7 +3,6 @@ using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Google.Apis.Upload;
-using Google.Apis.Util.Store;
 using DriveFile = Google.Apis.Drive.v3.Data.File;
 
 namespace GameTrackerPC.Services;
@@ -51,17 +50,14 @@ public sealed class GoogleDriveBackupService
 
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
-        var secretPath = AppPaths.FindGoogleClientSecret()
-            ?? throw new FileNotFoundException("Google OAuth desktop client JSON was not found in JsonSecret.");
-
-        await using var stream = File.OpenRead(secretPath);
+        await using var stream = GoogleOAuthClientSecretProvider.OpenRead();
         var secrets = GoogleClientSecrets.FromStream(stream).Secrets;
         var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
             secrets,
             [DriveService.Scope.DriveFile],
             "user",
             cancellationToken,
-            new FileDataStore(AppPaths.GoogleTokenDirectory, fullPath: true));
+            new ProtectedFileDataStore(AppPaths.GoogleTokenDirectory));
 
         _driveService = new DriveService(new BaseClientService.Initializer
         {
@@ -86,12 +82,9 @@ public sealed class GoogleDriveBackupService
 
         try
         {
-            var secretPath = AppPaths.FindGoogleClientSecret()
-                ?? throw new FileNotFoundException("Google OAuth desktop client JSON was not found in JsonSecret.");
-
-            await using var stream = File.OpenRead(secretPath);
+            await using var stream = GoogleOAuthClientSecretProvider.OpenRead();
             var secrets = GoogleClientSecrets.FromStream(stream).Secrets;
-            var dataStore = new FileDataStore(AppPaths.GoogleTokenDirectory, fullPath: true);
+            var dataStore = new ProtectedFileDataStore(AppPaths.GoogleTokenDirectory);
             var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
             {
                 ClientSecrets = secrets,

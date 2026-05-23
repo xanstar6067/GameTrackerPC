@@ -15,10 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\JsonSecret\client_secret_*.json"
-             Link="JsonSecret\%(Filename)%(Extension)"
-             CopyToOutputDirectory="PreserveNewest"
-             CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Resources\GoogleOAuthClientSecret.dat" />
   </ItemGroup>
 
 </Project>

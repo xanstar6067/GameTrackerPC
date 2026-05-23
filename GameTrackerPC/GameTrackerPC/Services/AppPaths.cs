@@ -18,27 +18,6 @@ public static class AppPaths
         Directory.CreateDirectory(ImagesDirectory);
         Directory.CreateDirectory(DefaultBackupDirectory);
     }
-
-    public static string? FindGoogleClientSecret()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
-        {
-            var candidateDirectory = Path.Combine(current.FullName, "JsonSecret");
-            if (Directory.Exists(candidateDirectory))
-            {
-                var file = Directory.EnumerateFiles(candidateDirectory, "client_secret_*.json").FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(file))
-                {
-                    return file;
-                }
-            }
-
-            current = current.Parent;
-        }
-
-        return null;
-    }
 }
 
 public static class AppSettingKeys
