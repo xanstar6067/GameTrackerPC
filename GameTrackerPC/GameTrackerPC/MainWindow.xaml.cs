@@ -1463,7 +1463,7 @@ public partial class MainWindow : Window
         Resources["GameCardUpdatedMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
         Resources["GameCardCoverWidth"] = 58 * _cardScale;
         Resources["GameCardCoverHeight"] = 78 * _cardScale;
-        Resources["GameCardHeight"] = 98 * _cardScale;
+        Resources["GameCardHeight"] = 132 * _cardScale;
         Resources["GameCardTitleFontSize"] = 15 * _cardScale;
         Resources["GameCardSmallFontSize"] = 11 * _cardScale;
 
@@ -1492,6 +1492,23 @@ public partial class MainWindow : Window
         }
 
         await SaveCardScaleAsync();
+    }
+
+    private void DecreaseCardScaleButton_Click(object sender, RoutedEventArgs e)
+    {
+        AdjustCardScaleByPercent(-1);
+    }
+
+    private void IncreaseCardScaleButton_Click(object sender, RoutedEventArgs e)
+    {
+        AdjustCardScaleByPercent(1);
+    }
+
+    private void AdjustCardScaleByPercent(int percentDelta)
+    {
+        var currentPercent = (int)Math.Round(_cardScale * 100, MidpointRounding.AwayFromZero);
+        var nextScale = Clamp((currentPercent + percentDelta) / 100d, MinCardScale, MaxCardScale);
+        CardScaleSlider.Value = nextScale;
     }
 
     private Style CreateGameItemStyle(LibraryViewMode mode)
