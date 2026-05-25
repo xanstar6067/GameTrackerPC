@@ -205,6 +205,8 @@ public partial class MainWindow : Window
 
         foreach (var game in query)
         {
+            var imagePath = File.Exists(game.ImageLocalPath) ? game.ImageLocalPath : null;
+            var coverAspectRatio = GetImageAspectRatio(imagePath);
             _gameItems.Add(new GameListItem
             {
                 Id = game.Id,
@@ -213,7 +215,9 @@ public partial class MainWindow : Window
                 Statuses = FormatStatuses(game.Statuses.Select(item => item.Status)),
                 YearText = game.Year?.ToString(CultureInfo.InvariantCulture) ?? "-",
                 UpdatedText = string.Format(CultureInfo.CurrentCulture, T("UpdatedAt"), FormatTimestamp(game.UpdatedAt)),
-                ImagePath = File.Exists(game.ImageLocalPath) ? game.ImageLocalPath : null
+                ImagePath = imagePath,
+                CoverAspectRatio = coverAspectRatio,
+                CoverHeight = GetCardCoverHeight(coverAspectRatio)
             });
         }
 
@@ -1497,10 +1501,14 @@ public partial class MainWindow : Window
         Resources["GameCardUpdatedMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
         var coverWidth = 68 * _cardScale;
         Resources["GameCardCoverWidth"] = coverWidth;
-        Resources["GameCardCoverHeight"] = coverWidth / CoverAspectRatio;
+        Resources["GameCardCoverHeight"] = coverWidth / DefaultCoverAspectRatio;
         Resources["GameCardHeight"] = 132 * _cardScale;
         Resources["GameCardTitleFontSize"] = 15 * _cardScale;
         Resources["GameCardSmallFontSize"] = 11 * _cardScale;
+        foreach (var item in _gameItems)
+        {
+            item.CoverHeight = GetCardCoverHeight(item.CoverAspectRatio);
+        }
 
         if (CardScaleValueText is not null)
         {
@@ -2108,7 +2116,41 @@ public partial class MainWindow : Window
         var bitmap = LoadBitmap(path);
         CoverPreview.Source = bitmap;
         DetailsCoverPreview.Source = bitmap;
+        ApplyCoverFrameAspectRatio(GetBitmapAspectRatio(bitmap));
         ApplyCoverCrop();
+    }
+
+    private void ApplyCoverFrameAspectRatio(double aspectRatio)
+    {
+        if (CoverFrame is not null)
+        {
+            CoverFrame.Height = CoverFrame.Width / aspectRatio;
+        }
+
+        if (DetailsCoverFrame is not null)
+        {
+            DetailsCoverFrame.Height = DetailsCoverFrame.Width / aspectRatio;
+        }
+    }
+
+    private double GetCardCoverHeight(double aspectRatio)
+    {
+        var width = Resources["GameCardCoverWidth"] is double resourceWidth
+            ? resourceWidth
+            : 68 * _cardScale;
+        return width / aspectRatio;
+    }
+
+    private static double GetImageAspectRatio(string? path) => GetBitmapAspectRatio(LoadBitmap(path));
+
+    private static double GetBitmapAspectRatio(BitmapSource? bitmap)
+    {
+        if (bitmap is null || bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
+        {
+            return DefaultCoverAspectRatio;
+        }
+
+        return Clamp(bitmap.PixelWidth / (double)bitmap.PixelHeight, MinCoverAspectRatio, MaxCoverAspectRatio);
     }
 
     private static BitmapImage? LoadBitmap(string? path)
@@ -2318,7 +2360,9 @@ public partial class MainWindow : Window
     private const double MinCardScale = 0.75;
     private const double MaxCardScale = 4;
     private const double DefaultCardScale = 1.0;
-    private const double CoverAspectRatio = 2d / 3d;
+    private const double DefaultCoverAspectRatio = 3d / 4d;
+    private const double MinCoverAspectRatio = 0.5;
+    private const double MaxCoverAspectRatio = 1.0;
     private const string RussianLanguage = "ru";
     private const string EnglishLanguage = "en";
 
