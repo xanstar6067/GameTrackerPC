@@ -1163,6 +1163,10 @@
                                 Width="{Binding ActualWidth, ElementName=DetailsCoverFrame}"
                                 Margin="0"
                                 Click="EditCurrentGameButton_Click" />
+                        <Button Content="Delete"
+                                Width="{Binding ActualWidth, ElementName=DetailsCoverFrame}"
+                                Margin="0,10,0,0"
+                                Click="DeleteGameButton_Click" />
                     </StackPanel>
                     <Grid Grid.Column="1">
                         <Grid.RowDefinitions>
