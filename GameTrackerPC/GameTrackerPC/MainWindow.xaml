@@ -440,7 +440,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Grid Width="{DynamicResource GameCardCoverWidth}"
-                          Height="{Binding CoverHeight}"
+                          Height="{DynamicResource GameCardCoverHeight}"
                           VerticalAlignment="Top"
                           Background="{DynamicResource SurfaceAltBrush}"
                           ClipToBounds="True">
@@ -852,11 +852,50 @@
                               Background="{DynamicResource SurfaceAltBrush}"
                               ClipToBounds="True"
                               Margin="0,0,0,12"
+                              Cursor="Hand"
+                              MouseLeftButtonDown="CoverFrame_MouseLeftButtonDown"
+                              MouseMove="CoverFrame_MouseMove"
+                              MouseLeftButtonUp="CoverFrame_MouseLeftButtonUp"
+                              PreviewMouseWheel="CoverFrame_MouseWheel"
                               SizeChanged="CoverFrame_SizeChanged">
                             <Image x:Name="CoverPreview"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
                                    RenderTransformOrigin="0.5,0.5"
                                    RenderOptions.BitmapScalingMode="HighQuality"
-                                   Stretch="UniformToFill" />
+                                   Stretch="Fill" />
+                            <Border x:Name="CoverEditHint"
+                                    VerticalAlignment="Bottom"
+                                    Background="#B0000000"
+                                    Padding="8,6"
+                                    IsHitTestVisible="False">
+                                <TextBlock Text="Cover edit hint"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextBrush}" />
+                            </Border>
+                            <StackPanel x:Name="CoverEditActions"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Margin="8"
+                                        Visibility="Collapsed">
+                                <Button Content="X"
+                                        Width="34"
+                                        Height="30"
+                                        MinHeight="30"
+                                        Padding="0"
+                                        Margin="0,0,6,0"
+                                        Style="{StaticResource DangerButton}"
+                                        Click="CancelCoverEditButton_Click" />
+                                <Button Content="OK"
+                                        Width="34"
+                                        Height="30"
+                                        MinHeight="30"
+                                        Padding="0"
+                                        Margin="0"
+                                        Click="ApplyCoverEditButton_Click" />
+                            </StackPanel>
                             <Border BorderBrush="{DynamicResource BorderBrushSoft}"
                                     BorderThickness="1"
                                     IsHitTestVisible="False" />
@@ -974,70 +1013,6 @@
                                     <CheckBox x:Name="StatusNeverPlayAgainBox"
                                               Content="NEVER_PLAY_AGAIN" />
                                 </UniformGrid>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource CyberPanel}">
-                            <StackPanel>
-                                <TextBlock Text="Cover crop"
-                                           Style="{StaticResource SectionTitle}" />
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="90" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="70" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Row="0"
-                                               Grid.Column="0"
-                                               Text="Scale"
-                                               Style="{StaticResource LabelText}" />
-                                    <Slider x:Name="ImageScaleSlider"
-                                            Grid.Row="0"
-                                            Grid.Column="1"
-                                            Minimum="1"
-                                            Maximum="4"
-                                            TickFrequency="0.1"
-                                            ValueChanged="CropSlider_ValueChanged" />
-                                    <TextBlock x:Name="ImageScaleText"
-                                               Grid.Row="0"
-                                               Grid.Column="2"
-                                               TextAlignment="Right" />
-                                    <TextBlock Grid.Row="1"
-                                               Grid.Column="0"
-                                               Text="Offset X"
-                                               Style="{StaticResource LabelText}" />
-                                    <Slider x:Name="ImageOffsetXSlider"
-                                            Grid.Row="1"
-                                            Grid.Column="1"
-                                            Minimum="-2"
-                                            Maximum="2"
-                                            TickFrequency="0.1"
-                                            ValueChanged="CropSlider_ValueChanged" />
-                                    <TextBlock x:Name="ImageOffsetXText"
-                                               Grid.Row="1"
-                                               Grid.Column="2"
-                                               TextAlignment="Right" />
-                                    <TextBlock Grid.Row="2"
-                                               Grid.Column="0"
-                                               Text="Offset Y"
-                                               Style="{StaticResource LabelText}" />
-                                    <Slider x:Name="ImageOffsetYSlider"
-                                            Grid.Row="2"
-                                            Grid.Column="1"
-                                            Minimum="-2"
-                                            Maximum="2"
-                                            TickFrequency="0.1"
-                                            ValueChanged="CropSlider_ValueChanged" />
-                                    <TextBlock x:Name="ImageOffsetYText"
-                                               Grid.Row="2"
-                                               Grid.Column="2"
-                                               TextAlignment="Right" />
-                                </Grid>
                             </StackPanel>
                         </Border>
 
@@ -1175,9 +1150,11 @@
                               Margin="0,0,0,14"
                               SizeChanged="CoverFrame_SizeChanged">
                             <Image x:Name="DetailsCoverPreview"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
                                    RenderTransformOrigin="0.5,0.5"
                                    RenderOptions.BitmapScalingMode="HighQuality"
-                                   Stretch="UniformToFill" />
+                                   Stretch="Fill" />
                             <Border BorderBrush="{DynamicResource BorderBrushSoft}"
                                     BorderThickness="1"
                                     IsHitTestVisible="False" />

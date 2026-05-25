@@ -33,8 +33,19 @@ public partial class MainWindow : Window
     private bool _updatingThemeControls;
     private bool _suppressGameSelectionNavigation;
     private bool _suppressCardScaleSave;
+    private bool _coverEditMode;
+    private bool _coverDragActive;
+    private Point _coverDragStart;
     private LibraryViewMode _viewMode = LibraryViewMode.List;
     private double _cardScale = DefaultCardScale;
+    private double _imageScale = 1;
+    private double _imageOffsetX;
+    private double _imageOffsetY;
+    private double _coverDragStartOffsetX;
+    private double _coverDragStartOffsetY;
+    private double _coverEditStartScale;
+    private double _coverEditStartOffsetX;
+    private double _coverEditStartOffsetY;
     private string _language = RussianLanguage;
     private AppThemeMode _currentTheme = AppThemeMode.Light;
     private AppScreen _currentScreen = AppScreen.Start;
@@ -95,7 +106,7 @@ public partial class MainWindow : Window
         RefreshThemeControls();
         AutoAddSourceBox.ItemsSource = _autoAddService.SupportedSources;
         AutoAddSourceBox.SelectedItem = AutoAddSource.Steam;
-        ImageScaleSlider.Value = 1;
+        SetCoverCrop(1, 0, 0);
         ApplyCardScale(_cardScale);
         ShowScreen(AppScreen.Start, animate: false);
     }
@@ -207,7 +218,6 @@ public partial class MainWindow : Window
         foreach (var game in query)
         {
             var imagePath = File.Exists(game.ImageLocalPath) ? game.ImageLocalPath : null;
-            var coverAspectRatio = GetImageAspectRatio(imagePath);
             _gameItems.Add(new GameListItem
             {
                 Id = game.Id,
@@ -216,9 +226,7 @@ public partial class MainWindow : Window
                 Statuses = FormatStatuses(game.Statuses.Select(item => item.Status)),
                 YearText = game.Year?.ToString(CultureInfo.InvariantCulture) ?? "-",
                 UpdatedText = string.Format(CultureInfo.CurrentCulture, T("UpdatedAt"), FormatTimestamp(game.UpdatedAt)),
-                ImagePath = imagePath,
-                CoverAspectRatio = coverAspectRatio,
-                CoverHeight = GetCardCoverHeight(coverAspectRatio)
+                ImagePath = imagePath
             });
         }
 
@@ -316,9 +324,7 @@ public partial class MainWindow : Window
             _loadedCustomNotesStorage = game.CustomNotes;
             _loadedNotesDisplay = GameNotesSerializer.ToDisplayText(game.CustomNotes);
             NotesBox.Text = _loadedNotesDisplay;
-            ImageScaleSlider.Value = game.ImageScale;
-            ImageOffsetXSlider.Value = game.ImageOffsetX;
-            ImageOffsetYSlider.Value = game.ImageOffsetY;
+            SetCoverCrop(game.ImageScale, game.ImageOffsetX, game.ImageOffsetY);
             SetStatusCheckboxes(game.Statuses.Select(status => status.Status).ToHashSet());
             SetCoverPreview(game.ImageLocalPath);
             var gallery = game.ImageGallery.OrderBy(image => image.SortOrder).ToList();
@@ -330,7 +336,6 @@ public partial class MainWindow : Window
             DetailYearText.Text = game.Year?.ToString(CultureInfo.InvariantCulture) ?? "-";
             DetailSourceText.Text = string.IsNullOrWhiteSpace(game.SourcePageUrl) ? "-" : game.SourcePageUrl;
             DetailNotesText.Text = string.IsNullOrWhiteSpace(_loadedNotesDisplay) ? "-" : _loadedNotesDisplay;
-            UpdateCropText();
             ApplyPlatformControls();
         }
         finally
@@ -395,9 +400,7 @@ public partial class MainWindow : Window
             NotesBox.Text = string.Empty;
             _loadedCustomNotesStorage = null;
             _loadedNotesDisplay = string.Empty;
-            ImageScaleSlider.Value = 1;
-            ImageOffsetXSlider.Value = 0;
-            ImageOffsetYSlider.Value = 0;
+            SetCoverCrop(1, 0, 0);
             SetStatusCheckboxes(new HashSet<GameStatus> { GameStatus.PLANNED });
             SetCoverPreview(null);
             GalleryList.ItemsSource = null;
@@ -408,7 +411,6 @@ public partial class MainWindow : Window
             DetailYearText.Text = "-";
             DetailSourceText.Text = "-";
             DetailNotesText.Text = "-";
-            UpdateCropText();
         }
         finally
         {
@@ -637,9 +639,9 @@ public partial class MainWindow : Window
         game.CustomNotes = string.Equals(NotesBox.Text, _loadedNotesDisplay, StringComparison.Ordinal)
             ? _loadedCustomNotesStorage
             : GameNotesSerializer.ToStorageFromPlainText(NotesBox.Text);
-        game.ImageScale = Clamp(ImageScaleSlider.Value, 1, 4);
-        game.ImageOffsetX = Clamp(ImageOffsetXSlider.Value, -2, 2);
-        game.ImageOffsetY = Clamp(ImageOffsetYSlider.Value, -2, 2);
+        game.ImageScale = _imageScale;
+        game.ImageOffsetX = _imageOffsetX;
+        game.ImageOffsetY = _imageOffsetY;
         game.UpdatedAt = now;
 
         var oldStatuses = game.Statuses.ToList();
@@ -961,6 +963,9 @@ public partial class MainWindow : Window
         game.ImageArchiveName = archiveName;
         game.ImageSourceUrl = sourceUrl ?? game.ImageSourceUrl;
         game.ImageSourceType = sourceType;
+        game.ImageScale = 1;
+        game.ImageOffsetX = 0;
+        game.ImageOffsetY = 0;
         game.UpdatedAt = Clock.UnixMillisecondsNow();
         await db.SaveChangesAsync();
         await LoadGameIntoEditorAsync(id);
@@ -1521,11 +1526,6 @@ public partial class MainWindow : Window
         Resources["GameCardHeight"] = 132 * _cardScale;
         Resources["GameCardTitleFontSize"] = 15 * _cardScale;
         Resources["GameCardSmallFontSize"] = 11 * _cardScale;
-        foreach (var item in _gameItems)
-        {
-            item.CoverHeight = GetCardCoverHeight(item.CoverAspectRatio);
-        }
-
         if (CardScaleValueText is not null)
         {
             CardScaleValueText.Text = $"{Math.Round(_cardScale * 100, MidpointRounding.AwayFromZero):0}%";
@@ -1868,24 +1868,6 @@ public partial class MainWindow : Window
         ConsoleModelBox.IsEnabled = platform == PlatformType.CONSOLE;
     }
 
-    private void CropSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        UpdateCropText();
-        ApplyCoverCrop();
-    }
-
-    private void UpdateCropText()
-    {
-        if (ImageScaleText is null)
-        {
-            return;
-        }
-
-        ImageScaleText.Text = ImageScaleSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
-        ImageOffsetXText.Text = ImageOffsetXSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
-        ImageOffsetYText.Text = ImageOffsetYSlider.Value.ToString("0.0", CultureInfo.InvariantCulture);
-    }
-
     private void CoverFrame_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         ApplyCoverCrop();
@@ -1893,27 +1875,183 @@ public partial class MainWindow : Window
 
     private void ApplyCoverCrop()
     {
-        if (CoverPreview is null || DetailsCoverPreview is null || ImageScaleSlider is null)
+        if (CoverPreview is null || DetailsCoverPreview is null)
         {
             return;
         }
 
-        var scale = Clamp(ImageScaleSlider.Value, 1, 4);
-        var offsetX = Clamp(ImageOffsetXSlider.Value, -2, 2);
-        var offsetY = Clamp(ImageOffsetYSlider.Value, -2, 2);
-        ApplyCoverTransform(CoverPreview, scale, offsetX, offsetY);
-        ApplyCoverTransform(DetailsCoverPreview, scale, offsetX, offsetY);
+        ApplyCoverTransform(CoverPreview, CoverFrame, _imageScale, _imageOffsetX, _imageOffsetY);
+        ApplyCoverTransform(DetailsCoverPreview, DetailsCoverFrame, _imageScale, _imageOffsetX, _imageOffsetY);
     }
 
-    private static void ApplyCoverTransform(Image image, double scale, double offsetX, double offsetY)
+    private void SetCoverCrop(double scale, double offsetX, double offsetY)
     {
-        var width = image.ActualWidth <= 0 ? 1 : image.ActualWidth;
-        var height = image.ActualHeight <= 0 ? 1 : image.ActualHeight;
+        _imageScale = Clamp(scale, 1, 4);
+        var (maxPanX, maxPanY) = CoverPreview is null || CoverFrame is null
+            ? (1d, 1d)
+            : GetCoverPanBounds(CoverPreview, CoverFrame, _imageScale);
+        _imageOffsetX = maxPanX <= 0 ? 0 : Clamp(offsetX, -2, 2);
+        _imageOffsetY = maxPanY <= 0 ? 0 : Clamp(offsetY, -2, 2);
+        ApplyCoverCrop();
+    }
+
+    private void CoverFrame_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && IsInsideCoverEditAction(source))
+        {
+            return;
+        }
+
+        if (!_coverEditMode)
+        {
+            EnterCoverEditMode();
+        }
+
+        _coverDragActive = true;
+        _coverDragStart = e.GetPosition(CoverFrame);
+        _coverDragStartOffsetX = _imageOffsetX;
+        _coverDragStartOffsetY = _imageOffsetY;
+        CoverFrame.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void CoverFrame_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_coverEditMode || !_coverDragActive || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var position = e.GetPosition(CoverFrame);
+        var (maxPanX, maxPanY) = GetCoverPanBounds(CoverPreview, CoverFrame, _imageScale);
+        var startPixelX = OffsetToPixels(_coverDragStartOffsetX, maxPanX);
+        var startPixelY = OffsetToPixels(_coverDragStartOffsetY, maxPanY);
+        var nextOffsetX = PixelsToOffset(startPixelX + position.X - _coverDragStart.X, maxPanX);
+        var nextOffsetY = PixelsToOffset(startPixelY + position.Y - _coverDragStart.Y, maxPanY);
+        SetCoverCrop(_imageScale, nextOffsetX, nextOffsetY);
+        e.Handled = true;
+    }
+
+    private void CoverFrame_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        _coverDragActive = false;
+        CoverFrame.ReleaseMouseCapture();
+        e.Handled = true;
+    }
+
+    private void CoverFrame_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (!_coverEditMode)
+        {
+            return;
+        }
+
+        var step = e.Delta > 0 ? 0.1 : -0.1;
+        SetCoverCrop(_imageScale + step, _imageOffsetX, _imageOffsetY);
+        e.Handled = true;
+    }
+
+    private void ApplyCoverEditButton_Click(object sender, RoutedEventArgs e)
+    {
+        ExitCoverEditMode(keepChanges: true);
+        e.Handled = true;
+    }
+
+    private void CancelCoverEditButton_Click(object sender, RoutedEventArgs e)
+    {
+        SetCoverCrop(_coverEditStartScale, _coverEditStartOffsetX, _coverEditStartOffsetY);
+        ExitCoverEditMode(keepChanges: false);
+        e.Handled = true;
+    }
+
+    private void EnterCoverEditMode()
+    {
+        _coverEditMode = true;
+        _coverEditStartScale = _imageScale;
+        _coverEditStartOffsetX = _imageOffsetX;
+        _coverEditStartOffsetY = _imageOffsetY;
+        CoverEditActions.Visibility = Visibility.Visible;
+        CoverEditHint.Visibility = Visibility.Collapsed;
+        CoverFrame.Cursor = Cursors.SizeAll;
+    }
+
+    private void ExitCoverEditMode(bool keepChanges)
+    {
+        _coverEditMode = false;
+        _coverDragActive = false;
+        CoverFrame.ReleaseMouseCapture();
+        CoverEditActions.Visibility = Visibility.Collapsed;
+        CoverEditHint.Visibility = Visibility.Visible;
+        CoverFrame.Cursor = Cursors.Hand;
+    }
+
+    private static bool IsInsideCoverEditAction(DependencyObject source)
+    {
+        while (source is not null)
+        {
+            if (source is Button)
+            {
+                return true;
+            }
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return false;
+    }
+
+    private static void ApplyCoverTransform(Image image, FrameworkElement frame, double scale, double offsetX, double offsetY)
+    {
+        UpdateCoverImageLayout(image, frame);
+        var (maxPanX, maxPanY) = GetCoverPanBounds(image, frame, scale);
         var transform = new TransformGroup();
         transform.Children.Add(new ScaleTransform(scale, scale));
-        transform.Children.Add(new TranslateTransform(offsetX * width * 0.18, offsetY * height * 0.18));
+        transform.Children.Add(new TranslateTransform(OffsetToPixels(offsetX, maxPanX), OffsetToPixels(offsetY, maxPanY)));
         image.RenderTransform = transform;
     }
+
+    private static void UpdateCoverImageLayout(Image image, FrameworkElement frame)
+    {
+        if (image.Source is not BitmapSource bitmap || frame.ActualWidth <= 0 || frame.ActualHeight <= 0)
+        {
+            image.Width = double.NaN;
+            image.Height = double.NaN;
+            return;
+        }
+
+        var frameWidth = frame.ActualWidth;
+        var frameHeight = frame.ActualHeight;
+        var imageAspect = bitmap.PixelWidth / (double)bitmap.PixelHeight;
+        var frameAspect = frameWidth / frameHeight;
+        if (imageAspect > frameAspect)
+        {
+            image.Width = frameWidth;
+            image.Height = frameWidth / imageAspect;
+        }
+        else
+        {
+            image.Height = frameHeight;
+            image.Width = frameHeight * imageAspect;
+        }
+    }
+
+    private static (double MaxX, double MaxY) GetCoverPanBounds(Image image, FrameworkElement frame, double scale)
+    {
+        UpdateCoverImageLayout(image, frame);
+        var frameWidth = frame.ActualWidth <= 0 ? 1 : frame.ActualWidth;
+        var frameHeight = frame.ActualHeight <= 0 ? 1 : frame.ActualHeight;
+        var imageWidth = double.IsNaN(image.Width) || image.Width <= 0 ? frameWidth : image.Width;
+        var imageHeight = double.IsNaN(image.Height) || image.Height <= 0 ? frameHeight : image.Height;
+        return (
+            Math.Max(0, (imageWidth * scale - frameWidth) / 2),
+            Math.Max(0, (imageHeight * scale - frameHeight) / 2));
+    }
+
+    private static double OffsetToPixels(double offset, double maxPan) =>
+        maxPan <= 0 ? 0 : Clamp(offset, -2, 2) * maxPan / 2;
+
+    private static double PixelsToOffset(double pixels, double maxPan) =>
+        maxPan <= 0 ? 0 : Clamp(pixels, -maxPan, maxPan) / maxPan * 2;
 
     private void SetLanguage(string language)
     {
@@ -2133,41 +2271,7 @@ public partial class MainWindow : Window
         var bitmap = LoadBitmap(path);
         CoverPreview.Source = bitmap;
         DetailsCoverPreview.Source = bitmap;
-        ApplyCoverFrameAspectRatio(GetBitmapAspectRatio(bitmap));
-        ApplyCoverCrop();
-    }
-
-    private void ApplyCoverFrameAspectRatio(double aspectRatio)
-    {
-        if (CoverFrame is not null)
-        {
-            CoverFrame.Height = CoverFrame.Width / aspectRatio;
-        }
-
-        if (DetailsCoverFrame is not null)
-        {
-            DetailsCoverFrame.Height = DetailsCoverFrame.Width / aspectRatio;
-        }
-    }
-
-    private double GetCardCoverHeight(double aspectRatio)
-    {
-        var width = Resources["GameCardCoverWidth"] is double resourceWidth
-            ? resourceWidth
-            : 68 * _cardScale;
-        return width / aspectRatio;
-    }
-
-    private static double GetImageAspectRatio(string? path) => GetBitmapAspectRatio(LoadBitmap(path));
-
-    private static double GetBitmapAspectRatio(BitmapSource? bitmap)
-    {
-        if (bitmap is null || bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
-        {
-            return DefaultCoverAspectRatio;
-        }
-
-        return Clamp(bitmap.PixelWidth / (double)bitmap.PixelHeight, MinCoverAspectRatio, MaxCoverAspectRatio);
+        SetCoverCrop(_imageScale, _imageOffsetX, _imageOffsetY);
     }
 
     private static BitmapImage? LoadBitmap(string? path)
@@ -2378,8 +2482,6 @@ public partial class MainWindow : Window
     private const double MaxCardScale = 4;
     private const double DefaultCardScale = 1.0;
     private const double DefaultCoverAspectRatio = 3d / 4d;
-    private const double MinCoverAspectRatio = 0.5;
-    private const double MaxCoverAspectRatio = 1.0;
     private const string RussianLanguage = "ru";
     private const string EnglishLanguage = "en";
 
@@ -2511,6 +2613,7 @@ public partial class MainWindow : Window
         ["Scale"] = "Масштаб",
         ["Offset X"] = "Сдвиг X",
         ["Offset Y"] = "Сдвиг Y",
+        ["Cover edit hint"] = "Клик по обложке: перетаскивание - сдвиг, колесо - масштаб.",
         ["Source page URL"] = "URL страницы источника",
         ["Notes"] = "Заметки",
         ["Save"] = "Сохранить",
@@ -2709,7 +2812,8 @@ public partial class MainWindow : Window
         ["StatusNeverPlayAgain"] = "Never play again",
         ["PlatformPc"] = "PC",
         ["PlatformConsole"] = "Console",
-        ["PlatformMobile"] = "Mobile"
+        ["PlatformMobile"] = "Mobile",
+        ["Cover edit hint"] = "Click cover to adjust. Drag to pan, wheel to zoom."
     };
 
     private static readonly IReadOnlyDictionary<string, string> StaticTextTranslations = BuildStaticTextTranslations();
