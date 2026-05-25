@@ -1495,8 +1495,8 @@ public partial class MainWindow : Window
         Resources["GameCardSubtitleMargin"] = new Thickness(0, 4 * _cardScale, 0, 0);
         Resources["GameCardChipMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
         Resources["GameCardUpdatedMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
-        Resources["GameCardCoverWidth"] = 58 * _cardScale;
-        Resources["GameCardCoverHeight"] = 78 * _cardScale;
+        Resources["GameCardCoverWidth"] = 68 * _cardScale;
+        Resources["GameCardCoverHeight"] = 92 * _cardScale;
         Resources["GameCardHeight"] = 132 * _cardScale;
         Resources["GameCardTitleFontSize"] = 15 * _cardScale;
         Resources["GameCardSmallFontSize"] = 11 * _cardScale;

@@ -441,6 +441,7 @@
                     </Grid.ColumnDefinitions>
                     <Border Width="{DynamicResource GameCardCoverWidth}"
                             Height="{DynamicResource GameCardCoverHeight}"
+                            VerticalAlignment="Top"
                             Background="{DynamicResource SurfaceAltBrush}"
                             BorderBrush="{DynamicResource BorderBrushSoft}"
                             BorderThickness="1"
@@ -1138,9 +1139,8 @@
                 </Border>
             </ScrollViewer>
 
-            <ScrollViewer x:Name="DetailsScreen"
-                          Visibility="Collapsed"
-                          VerticalScrollBarVisibility="Auto">
+            <Grid x:Name="DetailsScreen"
+                  Visibility="Collapsed">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="360" />
@@ -1148,7 +1148,8 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0"
                                 Margin="0,0,18,0">
-                        <Border Height="470"
+                        <Border x:Name="DetailsCoverFrame"
+                                Height="470"
                                 Background="{DynamicResource SurfaceAltBrush}"
                                 BorderBrush="{DynamicResource BorderBrushSoft}"
                                 BorderThickness="1"
@@ -1161,10 +1162,18 @@
                                    Stretch="UniformToFill" />
                         </Border>
                         <Button Content="Edit"
+                                Width="{Binding ActualWidth, ElementName=DetailsCoverFrame}"
+                                Margin="0"
                                 Click="EditCurrentGameButton_Click" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1">
-                        <Border Style="{StaticResource CyberPanel}">
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0"
+                                Style="{StaticResource CyberPanel}">
                             <StackPanel>
                                 <TextBlock x:Name="DetailTitleText"
                                            Text="Game"
@@ -1196,7 +1205,8 @@
                                            TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource CyberPanel}">
+                        <Border Grid.Row="1"
+                                Style="{StaticResource CyberPanel}">
                             <StackPanel>
                                 <TextBlock Text="Notes"
                                            Style="{StaticResource SectionTitle}" />
@@ -1205,13 +1215,18 @@
                                            Foreground="{DynamicResource TextBrush}" />
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource CyberPanel}">
-                            <StackPanel>
+                        <Border Grid.Row="2"
+                                Style="{StaticResource CyberPanel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
                                 <TextBlock Text="Images"
                                            Style="{StaticResource SectionTitle}" />
                                 <ListBox x:Name="DetailsGalleryList"
-                                         Height="250"
-                                         IsHitTestVisible="False"
+                                         Grid.Row="1"
+                                         MinHeight="250"
                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListBox.ItemsPanel>
                                         <ItemsPanelTemplate>
@@ -1242,11 +1257,11 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
-                            </StackPanel>
+                            </Grid>
                         </Border>
-                    </StackPanel>
+                    </Grid>
                 </Grid>
-            </ScrollViewer>
+            </Grid>
 
             <ScrollViewer x:Name="ImportExportScreen"
                           Visibility="Collapsed"
