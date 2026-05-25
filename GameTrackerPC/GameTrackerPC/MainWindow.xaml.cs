@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -47,10 +49,16 @@ public partial class MainWindow : Window
     private double _coverEditStartOffsetX;
     private double _coverEditStartOffsetY;
     private string _language = RussianLanguage;
-    private AppThemeMode _currentTheme = AppThemeMode.Light;
+    private string _currentThemeKey = AppThemeMode.Light.ToString();
     private AppScreen _currentScreen = AppScreen.Start;
     private readonly Stack<AppScreen> _navigationStack = new();
+    private readonly List<ThemePalette> _customThemes = [];
     private ThemePalette _customTheme = ThemePalette.DefaultCustom;
+    private TextBox? _activeColorTextBox;
+    private bool _updatingColorPicker;
+    private double _pickerHue;
+    private double _pickerSaturation;
+    private double _pickerValue;
 
     public MainWindow()
     {
@@ -97,12 +105,12 @@ public partial class MainWindow : Window
         PlatformBox.SelectedValuePath = nameof(UiOption<PlatformType>.Value);
         LanguageBox.DisplayMemberPath = nameof(UiOption<string>.Text);
         LanguageBox.SelectedValuePath = nameof(UiOption<string>.Value);
-        StartThemeBox.DisplayMemberPath = nameof(UiOption<AppThemeMode>.Text);
-        StartThemeBox.SelectedValuePath = nameof(UiOption<AppThemeMode>.Value);
-        ThemeBox.DisplayMemberPath = nameof(UiOption<AppThemeMode>.Text);
-        ThemeBox.SelectedValuePath = nameof(UiOption<AppThemeMode>.Value);
-        ThemeEditorThemeBox.DisplayMemberPath = nameof(UiOption<AppThemeMode>.Text);
-        ThemeEditorThemeBox.SelectedValuePath = nameof(UiOption<AppThemeMode>.Value);
+        StartThemeBox.DisplayMemberPath = nameof(UiOption<string>.Text);
+        StartThemeBox.SelectedValuePath = nameof(UiOption<string>.Value);
+        ThemeBox.DisplayMemberPath = nameof(UiOption<string>.Text);
+        ThemeBox.SelectedValuePath = nameof(UiOption<string>.Value);
+        ThemeEditorThemeBox.DisplayMemberPath = nameof(UiOption<string>.Text);
+        ThemeEditorThemeBox.SelectedValuePath = nameof(UiOption<string>.Value);
         RefreshOptionControls();
         RefreshThemeControls();
         AutoAddSourceBox.ItemsSource = _autoAddService.SupportedSources;
@@ -135,9 +143,9 @@ public partial class MainWindow : Window
         await LoadCustomThemeAsync(db);
         RefreshThemeControls();
         var themeText = await GetSettingAsync(db, AppSettingKeys.Theme, AppThemeMode.Light.ToString());
-        var theme = Enum.TryParse<AppThemeMode>(themeText, out var parsedTheme) ? parsedTheme : AppThemeMode.Light;
-        ApplyTheme(theme);
-        SelectThemeControls(theme);
+        var themeKey = NormalizeThemeKey(themeText);
+        ApplyTheme(themeKey);
+        SelectThemeControls(themeKey);
     }
 
     private static async Task<string> GetSettingAsync(GameVaultDbContext db, string key, string fallback)
@@ -1619,13 +1627,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var theme = sender switch
+        var themeKey = sender switch
         {
-            ComboBox box when box.SelectedValue is AppThemeMode selectedTheme => selectedTheme,
-            _ => _currentTheme
+            ComboBox box when box.SelectedValue is string selectedThemeKey => selectedThemeKey,
+            _ => _currentThemeKey
         };
 
-        await ApplyAndSaveThemeAsync(theme);
+        await ApplyAndSaveThemeAsync(themeKey);
     }
 
     private async void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1648,30 +1656,53 @@ public partial class MainWindow : Window
 
     private async Task LoadCustomThemeAsync(GameVaultDbContext db)
     {
-        _customTheme = new ThemePalette(
-            await GetSettingAsync(db, AppSettingKeys.CustomThemeName, "Custom"),
-            await GetSettingAsync(db, AppSettingKeys.CustomThemeBackground, "#10131F"),
-            await GetSettingAsync(db, AppSettingKeys.CustomThemeSurface, "#171A29"),
-            await GetSettingAsync(db, AppSettingKeys.CustomThemePanel, "#0D101A"),
-            await GetSettingAsync(db, AppSettingKeys.CustomThemeText, "#F7F7FF"),
-            await GetSettingAsync(db, AppSettingKeys.CustomThemeMuted, "#A9B1C7"),
-            await GetSettingAsync(db, AppSettingKeys.CustomThemePrimary, "#7CF7C7"),
-            await GetSettingAsync(db, AppSettingKeys.CustomThemeSecondary, "#F7D56E"));
+        _customThemes.Clear();
+        var customThemesSetting = await db.AppSettings.FindAsync(AppSettingKeys.CustomThemes);
+        if (!string.IsNullOrWhiteSpace(customThemesSetting?.Value))
+        {
+            try
+            {
+                var themes = JsonSerializer.Deserialize<List<ThemePalette>>(customThemesSetting.Value, ThemeJsonOptions);
+                if (themes is not null)
+                {
+                    _customThemes.AddRange(themes.Where(IsCompleteTheme));
+                }
+            }
+            catch
+            {
+                _customThemes.Clear();
+            }
+        }
+        else if (customThemesSetting is null)
+        {
+            _customThemes.Add(new ThemePalette(
+                CreateThemeId(await GetSettingAsync(db, AppSettingKeys.CustomThemeName, "Custom")),
+                await GetSettingAsync(db, AppSettingKeys.CustomThemeName, "Custom"),
+                await GetSettingAsync(db, AppSettingKeys.CustomThemeBackground, "#10131F"),
+                await GetSettingAsync(db, AppSettingKeys.CustomThemeSurface, "#171A29"),
+                await GetSettingAsync(db, AppSettingKeys.CustomThemePanel, "#0D101A"),
+                await GetSettingAsync(db, AppSettingKeys.CustomThemeText, "#F7F7FF"),
+                await GetSettingAsync(db, AppSettingKeys.CustomThemeMuted, "#A9B1C7"),
+                await GetSettingAsync(db, AppSettingKeys.CustomThemePrimary, "#7CF7C7"),
+                await GetSettingAsync(db, AppSettingKeys.CustomThemeSecondary, "#F7D56E")));
+        }
+
+        _customTheme = _customThemes.FirstOrDefault() ?? ThemePalette.DefaultCustom with { Id = CreateThemeId("Custom") };
         UpdateCustomThemeFields();
     }
 
-    private async Task ApplyAndSaveThemeAsync(AppThemeMode theme)
+    private async Task ApplyAndSaveThemeAsync(string themeKey)
     {
-        ApplyTheme(theme);
-        SelectThemeControls(theme);
+        ApplyTheme(themeKey);
+        SelectThemeControls(themeKey);
         await using var db = CreateDb();
-        await SetSettingAsync(db, AppSettingKeys.Theme, theme.ToString());
+        await SetSettingAsync(db, AppSettingKeys.Theme, _currentThemeKey);
     }
 
-    private void ApplyTheme(AppThemeMode theme)
+    private void ApplyTheme(string themeKey)
     {
-        _currentTheme = theme;
-        var palette = GetThemePalette(theme);
+        _currentThemeKey = NormalizeThemeKey(themeKey);
+        var palette = GetThemePalette(_currentThemeKey);
         SetBrush("AppBackgroundBrush", palette.Background);
         SetBrush("SurfaceBrush", palette.Surface);
         SetBrush("SurfaceAltBrush", Shade(palette.Surface, 1.12));
@@ -1691,15 +1722,23 @@ public partial class MainWindow : Window
         Background = (Brush)Resources["AppBackgroundBrush"];
     }
 
-    private ThemePalette GetThemePalette(AppThemeMode theme) => theme switch
+    private ThemePalette GetThemePalette(string themeKey)
     {
-        AppThemeMode.Dark => new("Dark", "#07111F", "#111E31", "#0A1424", "#F8FAFC", "#94A3B8", "#38F2C2", "#FACC15"),
-        AppThemeMode.Oled => new("OLED", "#000000", "#070707", "#000000", "#FFFFFF", "#9CA3AF", "#00F5D4", "#E879F9"),
-        AppThemeMode.Cyberpunk => new("Cyberpunk", "#10091A", "#1B1029", "#0C0714", "#FDF4FF", "#D8B4FE", "#F8E71C", "#00E5FF", "#FF2D95"),
-        AppThemeMode.HalfLife => new("Half-Life", "#130E08", "#21170D", "#0C0905", "#FFF7ED", "#D6B28C", "#FF7A18", "#80C342"),
-        AppThemeMode.Custom => _customTheme,
-        _ => new("Light", "#EEF2F7", "#FFFFFF", "#F8FAFC", "#0F172A", "#475569", "#0F766E", "#B45309", "#DC2626", "#FFFFFF")
-    };
+        var custom = GetCustomTheme(themeKey);
+        if (custom is not null)
+        {
+            return custom;
+        }
+
+        return themeKey switch
+        {
+            nameof(AppThemeMode.Dark) => new(nameof(AppThemeMode.Dark), "Dark", "#07111F", "#111E31", "#0A1424", "#F8FAFC", "#94A3B8", "#38F2C2", "#FACC15"),
+            nameof(AppThemeMode.Oled) => new(nameof(AppThemeMode.Oled), "OLED", "#000000", "#070707", "#000000", "#FFFFFF", "#9CA3AF", "#00F5D4", "#E879F9"),
+            nameof(AppThemeMode.Cyberpunk) => new(nameof(AppThemeMode.Cyberpunk), "Cyberpunk", "#10091A", "#1B1029", "#0C0714", "#FDF4FF", "#D8B4FE", "#F8E71C", "#00E5FF", "#FF2D95"),
+            nameof(AppThemeMode.HalfLife) => new(nameof(AppThemeMode.HalfLife), "Half-Life", "#130E08", "#21170D", "#0C0905", "#FFF7ED", "#D6B28C", "#FF7A18", "#80C342"),
+            _ => new(nameof(AppThemeMode.Light), "Light", "#EEF2F7", "#FFFFFF", "#F8FAFC", "#0F172A", "#475569", "#0F766E", "#B45309", "#DC2626", "#FFFFFF")
+        };
+    }
 
     private void SetBrush(string key, string color)
     {
@@ -1741,15 +1780,20 @@ public partial class MainWindow : Window
 
     private void RefreshThemeControls()
     {
-        var themes = new UiOption<AppThemeMode>[]
+        if (!ThemeKeyExists(_currentThemeKey))
         {
-            new(AppThemeMode.Light, T("Light")),
-            new(AppThemeMode.Dark, T("Dark")),
-            new(AppThemeMode.Oled, "OLED"),
-            new(AppThemeMode.Cyberpunk, "Cyberpunk"),
-            new(AppThemeMode.HalfLife, "Half-Life"),
-            new(AppThemeMode.Custom, _customTheme.Name)
+            _currentThemeKey = nameof(AppThemeMode.Light);
+        }
+
+        var themes = new List<UiOption<string>>
+        {
+            new(nameof(AppThemeMode.Light), T("Light")),
+            new(nameof(AppThemeMode.Dark), T("Dark")),
+            new(nameof(AppThemeMode.Oled), "OLED"),
+            new(nameof(AppThemeMode.Cyberpunk), "Cyberpunk"),
+            new(nameof(AppThemeMode.HalfLife), "Half-Life")
         };
+        themes.AddRange(_customThemes.Select(theme => new UiOption<string>(GetCustomThemeKey(theme.Id), theme.Name)));
 
         _updatingThemeControls = true;
         try
@@ -1757,7 +1801,7 @@ public partial class MainWindow : Window
             StartThemeBox.ItemsSource = themes;
             ThemeBox.ItemsSource = themes;
             ThemeEditorThemeBox.ItemsSource = themes;
-            SelectThemeControls(_currentTheme);
+            SelectThemeControls(_currentThemeKey);
         }
         finally
         {
@@ -1765,14 +1809,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SelectThemeControls(AppThemeMode theme)
+    private void SelectThemeControls(string themeKey)
     {
         _updatingThemeControls = true;
         try
         {
-            StartThemeBox.SelectedValue = theme;
-            ThemeBox.SelectedValue = theme;
-            ThemeEditorThemeBox.SelectedValue = theme;
+            var normalizedThemeKey = NormalizeThemeKey(themeKey);
+            StartThemeBox.SelectedValue = normalizedThemeKey;
+            ThemeBox.SelectedValue = normalizedThemeKey;
+            ThemeEditorThemeBox.SelectedValue = normalizedThemeKey;
         }
         finally
         {
@@ -1795,21 +1840,61 @@ public partial class MainWindow : Window
         CustomThemeMutedBox.Text = _customTheme.Muted;
         CustomThemePrimaryBox.Text = _customTheme.Primary;
         CustomThemeSecondaryBox.Text = _customTheme.Secondary;
+        UpdateColorSwatches();
     }
 
     private async void ApplyThemeFromEditorButton_Click(object sender, RoutedEventArgs e)
     {
-        if (ThemeEditorThemeBox.SelectedValue is AppThemeMode theme)
+        if (ThemeEditorThemeBox.SelectedValue is string themeKey)
         {
-            await ApplyAndSaveThemeAsync(theme);
+            await ApplyAndSaveThemeAsync(themeKey);
         }
+    }
+
+    private void ThemeEditorThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingThemeControls || ThemeEditorThemeBox.SelectedValue is not string themeKey)
+        {
+            return;
+        }
+
+        var sourceTheme = GetThemePalette(themeKey);
+        _customTheme = IsCustomThemeKey(themeKey)
+            ? sourceTheme
+            : sourceTheme with { Id = CreateThemeId(sourceTheme.Name), Name = CreateCopyThemeName(sourceTheme.Name) };
+        UpdateCustomThemeFields();
+    }
+
+    private void NewCustomThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        _customTheme = ThemePalette.DefaultCustom with
+        {
+            Id = CreateThemeId("Custom"),
+            Name = CreateCopyThemeName("Custom")
+        };
+        _updatingThemeControls = true;
+        try
+        {
+            ThemeEditorThemeBox.SelectedIndex = -1;
+        }
+        finally
+        {
+            _updatingThemeControls = false;
+        }
+
+        UpdateCustomThemeFields();
     }
 
     private async void SaveCustomThemeButton_Click(object sender, RoutedEventArgs e)
     {
         await RunUiActionAsync(T("UnableSaveTheme"), async () =>
         {
+            var selectedThemeKey = ThemeEditorThemeBox.SelectedValue as string;
+            var themeId = selectedThemeKey is not null && IsCustomThemeKey(selectedThemeKey) && GetCustomTheme(selectedThemeKey) is not null
+                ? selectedThemeKey[CustomThemeKeyPrefix.Length..]
+                : CreateThemeId(CustomThemeNameBox.Text);
             _customTheme = new ThemePalette(
+                themeId,
                 string.IsNullOrWhiteSpace(CustomThemeNameBox.Text) ? "Custom" : CustomThemeNameBox.Text.Trim(),
                 NormalizeColor(CustomThemeBackgroundBox.Text),
                 NormalizeColor(CustomThemeSurfaceBox.Text),
@@ -1819,12 +1904,23 @@ public partial class MainWindow : Window
                 NormalizeColor(CustomThemePrimaryBox.Text),
                 NormalizeColor(CustomThemeSecondaryBox.Text));
 
+            var existingIndex = _customThemes.FindIndex(theme => string.Equals(theme.Id, _customTheme.Id, StringComparison.Ordinal));
+            if (existingIndex >= 0)
+            {
+                _customThemes[existingIndex] = _customTheme;
+            }
+            else
+            {
+                _customThemes.Add(_customTheme);
+            }
+
             await using var db = CreateDb();
             await SaveCustomThemeSettingsAsync(db);
             RefreshThemeControls();
-            ApplyTheme(AppThemeMode.Custom);
-            SelectThemeControls(AppThemeMode.Custom);
-            await SetSettingAsync(db, AppSettingKeys.Theme, AppThemeMode.Custom.ToString());
+            var customThemeKey = GetCustomThemeKey(_customTheme.Id);
+            ApplyTheme(customThemeKey);
+            SelectThemeControls(customThemeKey);
+            await SetSettingAsync(db, AppSettingKeys.Theme, customThemeKey);
             SetStatus(T("CustomThemeSaved"));
         });
     }
@@ -1833,20 +1929,29 @@ public partial class MainWindow : Window
     {
         await RunUiActionAsync(T("UnableDeleteTheme"), async () =>
         {
-            _customTheme = ThemePalette.DefaultCustom;
-            UpdateCustomThemeFields();
+            if (ThemeEditorThemeBox.SelectedValue is not string selectedThemeKey || !IsCustomThemeKey(selectedThemeKey))
+            {
+                return;
+            }
+
+            _customThemes.RemoveAll(theme => string.Equals(GetCustomThemeKey(theme.Id), selectedThemeKey, StringComparison.Ordinal));
+            var deletedActiveTheme = string.Equals(_currentThemeKey, selectedThemeKey, StringComparison.Ordinal);
+            _customTheme = _customThemes.FirstOrDefault() ?? ThemePalette.DefaultCustom with { Id = CreateThemeId("Custom") };
             await using var db = CreateDb();
             await SaveCustomThemeSettingsAsync(db);
             RefreshThemeControls();
-            ApplyTheme(AppThemeMode.Light);
-            SelectThemeControls(AppThemeMode.Light);
-            await SetSettingAsync(db, AppSettingKeys.Theme, AppThemeMode.Light.ToString());
+            var nextThemeKey = deletedActiveTheme ? nameof(AppThemeMode.Light) : _currentThemeKey;
+            ApplyTheme(nextThemeKey);
+            SelectThemeControls(nextThemeKey);
+            UpdateCustomThemeFields();
+            await SetSettingAsync(db, AppSettingKeys.Theme, _currentThemeKey);
             SetStatus(T("CustomThemeDeleted"));
         });
     }
 
     private async Task SaveCustomThemeSettingsAsync(GameVaultDbContext db)
     {
+        await SetSettingAsync(db, AppSettingKeys.CustomThemes, JsonSerializer.Serialize(_customThemes, ThemeJsonOptions));
         await SetSettingAsync(db, AppSettingKeys.CustomThemeName, _customTheme.Name);
         await SetSettingAsync(db, AppSettingKeys.CustomThemeBackground, _customTheme.Background);
         await SetSettingAsync(db, AppSettingKeys.CustomThemeSurface, _customTheme.Surface);
@@ -1861,6 +1966,337 @@ public partial class MainWindow : Window
     {
         var color = ParseColor(value.Trim());
         return ColorToHex(color);
+    }
+
+    private string NormalizeThemeKey(string? themeKey)
+    {
+        if (string.IsNullOrWhiteSpace(themeKey))
+        {
+            return nameof(AppThemeMode.Light);
+        }
+
+        if (string.Equals(themeKey, nameof(AppThemeMode.Custom), StringComparison.OrdinalIgnoreCase))
+        {
+            return _customThemes.Count > 0 ? GetCustomThemeKey(_customThemes[0].Id) : nameof(AppThemeMode.Light);
+        }
+
+        if (IsCustomThemeKey(themeKey))
+        {
+            return GetCustomTheme(themeKey) is not null ? themeKey : nameof(AppThemeMode.Light);
+        }
+
+        return Enum.TryParse<AppThemeMode>(themeKey, ignoreCase: true, out var theme) && theme != AppThemeMode.Custom
+            ? theme.ToString()
+            : nameof(AppThemeMode.Light);
+    }
+
+    private bool ThemeKeyExists(string themeKey) =>
+        IsCustomThemeKey(themeKey)
+            ? GetCustomTheme(themeKey) is not null
+            : Enum.TryParse<AppThemeMode>(themeKey, out var theme) && theme != AppThemeMode.Custom;
+
+    private ThemePalette? GetCustomTheme(string? themeKey)
+    {
+        if (!IsCustomThemeKey(themeKey))
+        {
+            return null;
+        }
+
+        var id = themeKey![CustomThemeKeyPrefix.Length..];
+        return _customThemes.FirstOrDefault(theme => string.Equals(theme.Id, id, StringComparison.Ordinal));
+    }
+
+    private static bool IsCustomThemeKey(string? themeKey) =>
+        themeKey?.StartsWith(CustomThemeKeyPrefix, StringComparison.Ordinal) == true;
+
+    private static string GetCustomThemeKey(string id) => $"{CustomThemeKeyPrefix}{id}";
+
+    private static bool IsCompleteTheme(ThemePalette theme) =>
+        !string.IsNullOrWhiteSpace(theme.Id)
+        && !string.IsNullOrWhiteSpace(theme.Name)
+        && !string.IsNullOrWhiteSpace(theme.Background)
+        && !string.IsNullOrWhiteSpace(theme.Surface)
+        && !string.IsNullOrWhiteSpace(theme.Panel)
+        && !string.IsNullOrWhiteSpace(theme.Text)
+        && !string.IsNullOrWhiteSpace(theme.Muted)
+        && !string.IsNullOrWhiteSpace(theme.Primary)
+        && !string.IsNullOrWhiteSpace(theme.Secondary);
+
+    private string CreateCopyThemeName(string baseName)
+    {
+        var root = string.IsNullOrWhiteSpace(baseName) ? "Custom" : baseName.Trim();
+        var candidate = root;
+        var index = 2;
+        while (_customThemes.Any(theme => string.Equals(theme.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            candidate = $"{root} {index}";
+            index++;
+        }
+
+        return candidate;
+    }
+
+    private static string CreateThemeId(string? name) =>
+        $"{Slugify(string.IsNullOrWhiteSpace(name) ? "custom" : name)}-{Guid.NewGuid():N}";
+
+    private void CustomThemeColorBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_updatingColorPicker)
+        {
+            return;
+        }
+
+        UpdateColorSwatches();
+        if (sender is TextBox textBox && ReferenceEquals(textBox, _activeColorTextBox) && ColorPickerPopup.IsOpen)
+        {
+            SetPickerFromColor(ParseColor(textBox.Text), updateTextBox: false);
+        }
+    }
+
+    private void ColorSwatch_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not TextBox textBox)
+        {
+            return;
+        }
+
+        _activeColorTextBox = textBox;
+        ColorPickerPopup.PlacementTarget = button;
+        SetPickerFromColor(ParseColor(textBox.Text), updateTextBox: false);
+        ColorPickerPopup.IsOpen = true;
+    }
+
+    private void SaturationValueImage_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        SaturationValueImage.CaptureMouse();
+        UpdateSaturationValueFromPoint(e.GetPosition(SaturationValueImage));
+    }
+
+    private void SaturationValueImage_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed)
+        {
+            UpdateSaturationValueFromPoint(e.GetPosition(SaturationValueImage));
+        }
+    }
+
+    private void HueImage_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        HueImage.CaptureMouse();
+        UpdateHueFromPoint(e.GetPosition(HueImage));
+    }
+
+    private void HueImage_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed)
+        {
+            UpdateHueFromPoint(e.GetPosition(HueImage));
+        }
+    }
+
+    private void ColorPickerImage_MouseUp(object sender, MouseButtonEventArgs e)
+    {
+        SaturationValueImage.ReleaseMouseCapture();
+        HueImage.ReleaseMouseCapture();
+    }
+
+    private void RgbSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_updatingColorPicker || RedSlider is null || GreenSlider is null || BlueSlider is null)
+        {
+            return;
+        }
+
+        var color = Color.FromRgb((byte)RedSlider.Value, (byte)GreenSlider.Value, (byte)BlueSlider.Value);
+        SetPickerFromColor(color, updateTextBox: true);
+    }
+
+    private void UpdateSaturationValueFromPoint(Point point)
+    {
+        _pickerSaturation = Clamp(point.X / Math.Max(1, SaturationValueImage.ActualWidth), 0, 1);
+        _pickerValue = 1 - Clamp(point.Y / Math.Max(1, SaturationValueImage.ActualHeight), 0, 1);
+        SetActivePickerColor(HsvToRgb(_pickerHue, _pickerSaturation, _pickerValue));
+    }
+
+    private void UpdateHueFromPoint(Point point)
+    {
+        _pickerHue = Clamp(point.Y / Math.Max(1, HueImage.ActualHeight), 0, 1) * 360;
+        RenderSaturationValueImage();
+        SetActivePickerColor(HsvToRgb(_pickerHue, _pickerSaturation, _pickerValue));
+    }
+
+    private void SetPickerFromColor(Color color, bool updateTextBox)
+    {
+        RgbToHsv(color, out _pickerHue, out _pickerSaturation, out _pickerValue);
+        RenderColorPickerImages();
+        SetActivePickerColor(color, updateTextBox);
+    }
+
+    private void SetActivePickerColor(Color color, bool updateTextBox = true)
+    {
+        _updatingColorPicker = true;
+        try
+        {
+            RedSlider.Value = color.R;
+            GreenSlider.Value = color.G;
+            BlueSlider.Value = color.B;
+            RedValueText.Text = color.R.ToString(CultureInfo.InvariantCulture);
+            GreenValueText.Text = color.G.ToString(CultureInfo.InvariantCulture);
+            BlueValueText.Text = color.B.ToString(CultureInfo.InvariantCulture);
+            PickerPreview.Background = new SolidColorBrush(color);
+            UpdatePickerMarkers();
+
+            if (updateTextBox && _activeColorTextBox is not null)
+            {
+                _activeColorTextBox.Text = ColorToHex(color);
+                UpdateColorSwatches();
+            }
+        }
+        finally
+        {
+            _updatingColorPicker = false;
+        }
+    }
+
+    private void RenderColorPickerImages()
+    {
+        RenderSaturationValueImage();
+        if (HueImage.Source is null)
+        {
+            HueImage.Source = CreateHueBitmap();
+        }
+    }
+
+    private void RenderSaturationValueImage()
+    {
+        SaturationValueImage.Source = CreateSaturationValueBitmap(_pickerHue);
+    }
+
+    private void UpdatePickerMarkers()
+    {
+        Canvas.SetLeft(SaturationValueMarker, _pickerSaturation * SaturationValueImage.Width - SaturationValueMarker.Width / 2);
+        Canvas.SetTop(SaturationValueMarker, (1 - _pickerValue) * SaturationValueImage.Height - SaturationValueMarker.Height / 2);
+        Canvas.SetLeft(HueMarker, -2);
+        Canvas.SetTop(HueMarker, _pickerHue / 360 * HueImage.Height - HueMarker.Height / 2);
+    }
+
+    private void UpdateColorSwatches()
+    {
+        SetSwatch(CustomThemeBackgroundSwatch, CustomThemeBackgroundBox);
+        SetSwatch(CustomThemeSurfaceSwatch, CustomThemeSurfaceBox);
+        SetSwatch(CustomThemePanelSwatch, CustomThemePanelBox);
+        SetSwatch(CustomThemeTextSwatch, CustomThemeTextBox);
+        SetSwatch(CustomThemeMutedSwatch, CustomThemeMutedBox);
+        SetSwatch(CustomThemePrimarySwatch, CustomThemePrimaryBox);
+        SetSwatch(CustomThemeSecondarySwatch, CustomThemeSecondaryBox);
+    }
+
+    private static void SetSwatch(Button button, TextBox textBox)
+    {
+        button.Background = new SolidColorBrush(ParseColor(textBox.Text));
+    }
+
+    private static WriteableBitmap CreateSaturationValueBitmap(double hue)
+    {
+        const int width = 276;
+        const int height = 234;
+        const int bytesPerPixel = 4;
+        var pixels = new byte[width * height * bytesPerPixel];
+        for (var y = 0; y < height; y++)
+        {
+            var value = 1 - y / (double)(height - 1);
+            for (var x = 0; x < width; x++)
+            {
+                var saturation = x / (double)(width - 1);
+                var color = HsvToRgb(hue, saturation, value);
+                var offset = (y * width + x) * bytesPerPixel;
+                pixels[offset] = color.B;
+                pixels[offset + 1] = color.G;
+                pixels[offset + 2] = color.R;
+                pixels[offset + 3] = 255;
+            }
+        }
+
+        var bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Pbgra32, null);
+        bitmap.WritePixels(new Int32Rect(0, 0, width, height), pixels, width * bytesPerPixel, 0);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    private static WriteableBitmap CreateHueBitmap()
+    {
+        const int width = 34;
+        const int height = 234;
+        const int bytesPerPixel = 4;
+        var pixels = new byte[width * height * bytesPerPixel];
+        for (var y = 0; y < height; y++)
+        {
+            var hue = y / (double)(height - 1) * 360;
+            var color = HsvToRgb(hue, 1, 1);
+            for (var x = 0; x < width; x++)
+            {
+                var offset = (y * width + x) * bytesPerPixel;
+                pixels[offset] = color.B;
+                pixels[offset + 1] = color.G;
+                pixels[offset + 2] = color.R;
+                pixels[offset + 3] = 255;
+            }
+        }
+
+        var bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Pbgra32, null);
+        bitmap.WritePixels(new Int32Rect(0, 0, width, height), pixels, width * bytesPerPixel, 0);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    private static Color HsvToRgb(double hue, double saturation, double value)
+    {
+        hue = (hue % 360 + 360) % 360;
+        saturation = Clamp(saturation, 0, 1);
+        value = Clamp(value, 0, 1);
+
+        var chroma = value * saturation;
+        var x = chroma * (1 - Math.Abs(hue / 60 % 2 - 1));
+        var match = value - chroma;
+        var (r, g, b) = hue switch
+        {
+            < 60 => (chroma, x, 0d),
+            < 120 => (x, chroma, 0d),
+            < 180 => (0d, chroma, x),
+            < 240 => (0d, x, chroma),
+            < 300 => (x, 0d, chroma),
+            _ => (chroma, 0d, x)
+        };
+
+        return Color.FromRgb(
+            (byte)Math.Round((r + match) * 255),
+            (byte)Math.Round((g + match) * 255),
+            (byte)Math.Round((b + match) * 255));
+    }
+
+    private static void RgbToHsv(Color color, out double hue, out double saturation, out double value)
+    {
+        var r = color.R / 255d;
+        var g = color.G / 255d;
+        var b = color.B / 255d;
+        var max = Math.Max(r, Math.Max(g, b));
+        var min = Math.Min(r, Math.Min(g, b));
+        var delta = max - min;
+
+        hue = delta == 0
+            ? 0
+            : max == r
+                ? 60 * (((g - b) / delta) % 6)
+                : max == g
+                    ? 60 * ((b - r) / delta + 2)
+                    : 60 * ((r - g) / delta + 4);
+        if (hue < 0)
+        {
+            hue += 360;
+        }
+
+        saturation = max == 0 ? 0 : delta / max;
+        value = max;
     }
 
     private void PlatformBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2215,6 +2651,11 @@ public partial class MainWindow : Window
                 break;
         }
 
+        if (root is FrameworkElement { ToolTip: string toolTipText } element)
+        {
+            element.ToolTip = TranslateLiteral(toolTipText);
+        }
+
         if (root is Visual or Visual3D)
         {
             var childrenCount = VisualTreeHelper.GetChildrenCount(root);
@@ -2510,6 +2951,7 @@ public partial class MainWindow : Window
     private sealed record UiOption<T>(T Value, string Text);
     private sealed record AutoImportedImage(string LocalPath, string ArchiveName, string SourceUrl);
     private sealed record ThemePalette(
+        string Id,
         string Name,
         string Background,
         string Surface,
@@ -2522,7 +2964,7 @@ public partial class MainWindow : Window
         string ButtonText = "#061019")
     {
         public static ThemePalette DefaultCustom { get; } =
-            new("Custom", "#10131F", "#171A29", "#0D101A", "#F7F7FF", "#A9B1C7", "#7CF7C7", "#F7D56E");
+            new("custom", "Custom", "#10131F", "#171A29", "#0D101A", "#F7F7FF", "#A9B1C7", "#7CF7C7", "#F7D56E");
     }
 
     private enum SortMode
@@ -2555,8 +2997,10 @@ public partial class MainWindow : Window
     private const double MaxCardScale = 4;
     private const double DefaultCardScale = 1.0;
     private const double DefaultCoverAspectRatio = 3d / 4d;
+    private const string CustomThemeKeyPrefix = "custom:";
     private const string RussianLanguage = "ru";
     private const string EnglishLanguage = "en";
+    private static readonly JsonSerializerOptions ThemeJsonOptions = new(JsonSerializerDefaults.Web);
 
     private static readonly IReadOnlyDictionary<string, string> RussianText = new Dictionary<string, string>
     {
@@ -2758,6 +3202,8 @@ public partial class MainWindow : Window
         ["Theme editor"] = "Редактор тем",
         ["Built-in themes"] = "Встроенные темы",
         ["Apply theme"] = "Применить тему",
+        ["New custom theme"] = "Новая кастомная тема",
+        ["Choose color"] = "Выбрать цвет",
         ["Custom theme"] = "Кастомная тема",
         ["Background"] = "Фон",
         ["Surface"] = "Поверхность",

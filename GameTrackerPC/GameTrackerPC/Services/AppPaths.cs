@@ -27,6 +27,7 @@ public static class AppSettingKeys
     public const string Theme = "theme";
     public const string Language = "language";
     public const string BackupFolder = "backupFolder";
+    public const string CustomThemes = "customThemes";
     public const string CustomThemeName = "customThemeName";
     public const string CustomThemeBackground = "customThemeBackground";
     public const string CustomThemeSurface = "customThemeSurface";

@@ -122,6 +122,42 @@
             <Setter Property="VerticalAlignment" Value="Stretch" />
         </Style>
 
+        <Style x:Key="ColorSwatchButton" TargetType="{x:Type Button}">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
+            <Setter Property="Background" Value="{DynamicResource InputBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform X="1" Y="1" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="{x:Type TextBox}">
             <Setter Property="MinHeight" Value="36" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -1448,10 +1484,16 @@
                                        Style="{StaticResource SectionTitle}" />
                             <ComboBox x:Name="ThemeEditorThemeBox"
                                       DisplayMemberPath="Text"
-                                      SelectedValuePath="Value" />
-                            <Button Content="Apply theme"
-                                    HorizontalAlignment="Left"
-                                    Click="ApplyThemeFromEditorButton_Click" />
+                                      SelectedValuePath="Value"
+                                      SelectionChanged="ThemeEditorThemeBox_SelectionChanged" />
+                            <WrapPanel>
+                                <Button Content="Apply theme"
+                                        HorizontalAlignment="Left"
+                                        Click="ApplyThemeFromEditorButton_Click" />
+                                <Button Content="New custom theme"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Click="NewCustomThemeButton_Click" />
+                            </WrapPanel>
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource CyberPanel}">
@@ -1470,27 +1512,125 @@
                                     <TextBox x:Name="CustomThemeNameBox" />
                                     <TextBlock Text="Background"
                                                Style="{StaticResource LabelText}" />
-                                    <TextBox x:Name="CustomThemeBackgroundBox" />
+                                    <Grid Margin="0,4,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CustomThemeBackgroundBox"
+                                                 Margin="0"
+                                                 TextChanged="CustomThemeColorBox_TextChanged" />
+                                        <Button x:Name="CustomThemeBackgroundSwatch"
+                                                Grid.Column="1"
+                                                Style="{StaticResource ColorSwatchButton}"
+                                                Tag="{Binding ElementName=CustomThemeBackgroundBox}"
+                                                ToolTip="Choose color"
+                                                Click="ColorSwatch_Click" />
+                                    </Grid>
                                     <TextBlock Text="Surface"
                                                Style="{StaticResource LabelText}" />
-                                    <TextBox x:Name="CustomThemeSurfaceBox" />
+                                    <Grid Margin="0,4,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CustomThemeSurfaceBox"
+                                                 Margin="0"
+                                                 TextChanged="CustomThemeColorBox_TextChanged" />
+                                        <Button x:Name="CustomThemeSurfaceSwatch"
+                                                Grid.Column="1"
+                                                Style="{StaticResource ColorSwatchButton}"
+                                                Tag="{Binding ElementName=CustomThemeSurfaceBox}"
+                                                ToolTip="Choose color"
+                                                Click="ColorSwatch_Click" />
+                                    </Grid>
                                     <TextBlock Text="Panel"
                                                Style="{StaticResource LabelText}" />
-                                    <TextBox x:Name="CustomThemePanelBox" />
+                                    <Grid Margin="0,4,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CustomThemePanelBox"
+                                                 Margin="0"
+                                                 TextChanged="CustomThemeColorBox_TextChanged" />
+                                        <Button x:Name="CustomThemePanelSwatch"
+                                                Grid.Column="1"
+                                                Style="{StaticResource ColorSwatchButton}"
+                                                Tag="{Binding ElementName=CustomThemePanelBox}"
+                                                ToolTip="Choose color"
+                                                Click="ColorSwatch_Click" />
+                                    </Grid>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="Text"
                                                Style="{StaticResource LabelText}" />
-                                    <TextBox x:Name="CustomThemeTextBox" />
+                                    <Grid Margin="0,4,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CustomThemeTextBox"
+                                                 Margin="0"
+                                                 TextChanged="CustomThemeColorBox_TextChanged" />
+                                        <Button x:Name="CustomThemeTextSwatch"
+                                                Grid.Column="1"
+                                                Style="{StaticResource ColorSwatchButton}"
+                                                Tag="{Binding ElementName=CustomThemeTextBox}"
+                                                ToolTip="Choose color"
+                                                Click="ColorSwatch_Click" />
+                                    </Grid>
                                     <TextBlock Text="Muted text"
                                                Style="{StaticResource LabelText}" />
-                                    <TextBox x:Name="CustomThemeMutedBox" />
+                                    <Grid Margin="0,4,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CustomThemeMutedBox"
+                                                 Margin="0"
+                                                 TextChanged="CustomThemeColorBox_TextChanged" />
+                                        <Button x:Name="CustomThemeMutedSwatch"
+                                                Grid.Column="1"
+                                                Style="{StaticResource ColorSwatchButton}"
+                                                Tag="{Binding ElementName=CustomThemeMutedBox}"
+                                                ToolTip="Choose color"
+                                                Click="ColorSwatch_Click" />
+                                    </Grid>
                                     <TextBlock Text="Primary"
                                                Style="{StaticResource LabelText}" />
-                                    <TextBox x:Name="CustomThemePrimaryBox" />
+                                    <Grid Margin="0,4,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CustomThemePrimaryBox"
+                                                 Margin="0"
+                                                 TextChanged="CustomThemeColorBox_TextChanged" />
+                                        <Button x:Name="CustomThemePrimarySwatch"
+                                                Grid.Column="1"
+                                                Style="{StaticResource ColorSwatchButton}"
+                                                Tag="{Binding ElementName=CustomThemePrimaryBox}"
+                                                ToolTip="Choose color"
+                                                Click="ColorSwatch_Click" />
+                                    </Grid>
                                     <TextBlock Text="Secondary"
                                                Style="{StaticResource LabelText}" />
-                                    <TextBox x:Name="CustomThemeSecondaryBox" />
+                                    <Grid Margin="0,4,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CustomThemeSecondaryBox"
+                                                 Margin="0"
+                                                 TextChanged="CustomThemeColorBox_TextChanged" />
+                                        <Button x:Name="CustomThemeSecondarySwatch"
+                                                Grid.Column="1"
+                                                Style="{StaticResource ColorSwatchButton}"
+                                                Tag="{Binding ElementName=CustomThemeSecondaryBox}"
+                                                ToolTip="Choose color"
+                                                Click="ColorSwatch_Click" />
+                                    </Grid>
                                 </StackPanel>
                             </Grid>
                             <WrapPanel>
@@ -1573,6 +1713,137 @@
                     </Border>
                 </StackPanel>
             </ScrollViewer>
+
+            <Popup x:Name="ColorPickerPopup"
+                   Placement="Bottom"
+                   StaysOpen="False"
+                   AllowsTransparency="True"
+                   PopupAnimation="Fade">
+                <Border Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrushSoft}"
+                        BorderThickness="1"
+                        Padding="12">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="276" />
+                            <ColumnDefinition Width="34" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <Canvas Width="276"
+                                Height="234">
+                            <Image x:Name="SaturationValueImage"
+                                   Width="276"
+                                   Height="234"
+                                   Stretch="Fill"
+                                   MouseDown="SaturationValueImage_MouseDown"
+                                   MouseMove="SaturationValueImage_MouseMove"
+                                   MouseUp="ColorPickerImage_MouseUp" />
+                            <Ellipse x:Name="SaturationValueMarker"
+                                     Width="10"
+                                     Height="10"
+                                     Stroke="White"
+                                     StrokeThickness="1"
+                                     Fill="Transparent"
+                                     IsHitTestVisible="False">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect BlurRadius="2"
+                                                      ShadowDepth="0"
+                                                      Color="Black" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                        </Canvas>
+                        <Canvas Grid.Column="1"
+                                Width="34"
+                                Height="234"
+                                Margin="8,0,0,0">
+                            <Image x:Name="HueImage"
+                                   Width="34"
+                                   Height="234"
+                                   Stretch="Fill"
+                                   MouseDown="HueImage_MouseDown"
+                                   MouseMove="HueImage_MouseMove"
+                                   MouseUp="ColorPickerImage_MouseUp" />
+                            <Rectangle x:Name="HueMarker"
+                                       Width="38"
+                                       Height="4"
+                                       Stroke="Black"
+                                       StrokeThickness="1"
+                                       Fill="Transparent"
+                                       IsHitTestVisible="False" />
+                        </Canvas>
+                        <Border x:Name="PickerPreview"
+                                Grid.Column="2"
+                                Width="34"
+                                Height="34"
+                                Margin="10,0,0,0"
+                                BorderBrush="{DynamicResource BorderBrushSoft}"
+                                BorderThickness="1" />
+
+                        <TextBlock Grid.Row="1"
+                                   Text="R"
+                                   Style="{StaticResource LabelText}"
+                                   VerticalAlignment="Center"
+                                   Margin="6,12,10,0" />
+                        <Slider x:Name="RedSlider"
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                Minimum="0"
+                                Maximum="255"
+                                Margin="30,12,0,0"
+                                ValueChanged="RgbSlider_ValueChanged" />
+                        <TextBlock x:Name="RedValueText"
+                                   Grid.Row="1"
+                                   Grid.Column="2"
+                                   Style="{StaticResource LabelText}"
+                                   Margin="10,12,0,0"
+                                   VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Row="2"
+                                   Text="G"
+                                   Style="{StaticResource LabelText}"
+                                   VerticalAlignment="Center"
+                                   Margin="6,6,10,0" />
+                        <Slider x:Name="GreenSlider"
+                                Grid.Row="2"
+                                Grid.Column="0"
+                                Minimum="0"
+                                Maximum="255"
+                                Margin="30,6,0,0"
+                                ValueChanged="RgbSlider_ValueChanged" />
+                        <TextBlock x:Name="GreenValueText"
+                                   Grid.Row="2"
+                                   Grid.Column="2"
+                                   Style="{StaticResource LabelText}"
+                                   Margin="10,6,0,0"
+                                   VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Row="3"
+                                   Text="B"
+                                   Style="{StaticResource LabelText}"
+                                   VerticalAlignment="Center"
+                                   Margin="6,6,10,0" />
+                        <Slider x:Name="BlueSlider"
+                                Grid.Row="3"
+                                Grid.Column="0"
+                                Minimum="0"
+                                Maximum="255"
+                                Margin="30,6,0,0"
+                                ValueChanged="RgbSlider_ValueChanged" />
+                        <TextBlock x:Name="BlueValueText"
+                                   Grid.Row="3"
+                                   Grid.Column="2"
+                                   Style="{StaticResource LabelText}"
+                                   Margin="10,6,0,0"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+            </Popup>
         </Grid>
     </Grid>
 </Window>
