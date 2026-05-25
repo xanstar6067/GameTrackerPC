@@ -1,5 +1,7 @@
 using System.Net.Http;
+using GameTrackerPC.Data;
 using GameTrackerPC.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameTrackerPC.Services;
 
@@ -89,6 +91,49 @@ public sealed class ImageService
         }
     }
 
+    public async Task<ImageCleanupResult> DeleteUnreferencedImagesAsync(
+        GameVaultDbContext db,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Directory.Exists(AppPaths.ImagesDirectory))
+        {
+            return new ImageCleanupResult(0, 0, 0);
+        }
+
+        var referenced = await GetReferencedImagePathsAsync(db, cancellationToken);
+        var scanned = 0;
+        var deleted = 0;
+        var failed = 0;
+
+        foreach (var file in Directory.EnumerateFiles(AppPaths.ImagesDirectory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            scanned++;
+            var normalizedFile = NormalizePath(file);
+
+            if (normalizedFile is null || referenced.Contains(normalizedFile))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+                deleted++;
+            }
+            catch (IOException)
+            {
+                failed++;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                failed++;
+            }
+        }
+
+        return new ImageCleanupResult(scanned, deleted, failed);
+    }
+
     private static string GuessExtension(string? mediaType, string localPath)
     {
         var extension = mediaType?.ToLowerInvariant() switch
@@ -116,6 +161,43 @@ public sealed class ImageService
         return client;
     }
 
+    private static async Task<HashSet<string>> GetReferencedImagePathsAsync(
+        GameVaultDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var paths = await db.Games
+            .Select(game => game.ImageLocalPath)
+            .Concat(db.GameImages.Select(image => image.LocalPath))
+            .Where(path => path != null && path != string.Empty)
+            .ToListAsync(cancellationToken);
+
+        return paths
+            .Select(NormalizePath)
+            .OfType<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string? NormalizePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Path.GetFullPath(path);
+        }
+        catch (ArgumentException)
+        {
+            return path.Trim();
+        }
+        catch (NotSupportedException)
+        {
+            return path.Trim();
+        }
+    }
+
     private static async Task CopyToFileWithProgressAsync(
         Stream source,
         Stream destination,
@@ -141,3 +223,5 @@ public sealed class ImageService
         }
     }
 }
+
+public sealed record ImageCleanupResult(int Scanned, int Deleted, int Failed);

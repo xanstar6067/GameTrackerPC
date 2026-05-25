@@ -68,6 +68,7 @@ public partial class MainWindow : Window
             await using (var db = CreateDb())
             {
                 DatabaseInitializer.Initialize(db);
+                await _imageService.DeleteUnreferencedImagesAsync(db);
             }
 
             _transferService = new LibraryTransferService(CreateDb);
@@ -882,6 +883,7 @@ public partial class MainWindow : Window
             {
                 db.Games.Remove(game);
                 await db.SaveChangesAsync();
+                await _imageService.DeleteUnreferencedImagesAsync(db);
             }
 
             await LoadGamesAsync();
@@ -972,6 +974,7 @@ public partial class MainWindow : Window
         game.ImageOffsetY = 0;
         game.UpdatedAt = Clock.UnixMillisecondsNow();
         await db.SaveChangesAsync();
+        await _imageService.DeleteUnreferencedImagesAsync(db);
         await LoadGameIntoEditorAsync(id);
         await LoadGamesAsync(id);
     }
@@ -1086,6 +1089,7 @@ public partial class MainWindow : Window
             {
                 db.GameImages.Remove(stored);
                 await db.SaveChangesAsync();
+                await _imageService.DeleteUnreferencedImagesAsync(db);
             }
 
             if (!string.IsNullOrWhiteSpace(_currentGameId))
@@ -1221,6 +1225,7 @@ public partial class MainWindow : Window
                 : await _transferService.ImportJsonAsync(path, ResolveImportConflict);
             await LoadReferencesAsync();
             await LoadGamesAsync();
+            await CleanupUnreferencedImagesAsync();
             SetStatus(FormatImportSummary(result));
         });
     }
@@ -1241,14 +1246,14 @@ public partial class MainWindow : Window
 
         await RunUiActionAsync(T("UnableClearImageCache"), async () =>
         {
-            _imageService.ClearImageCache();
+            var cleanup = await CleanupUnreferencedImagesAsync();
             await LoadGamesAsync(_currentGameId);
             if (!string.IsNullOrWhiteSpace(_currentGameId))
             {
                 await LoadGameIntoEditorAsync(_currentGameId);
             }
 
-            SetStatus(T("ImageCacheCleared"));
+            SetStatus(FormatImageCleanupSummary(cleanup));
         });
     }
 
@@ -1264,6 +1269,7 @@ public partial class MainWindow : Window
             await using var db = CreateDb();
             db.Games.RemoveRange(db.Games);
             await db.SaveChangesAsync();
+            await _imageService.DeleteUnreferencedImagesAsync(db);
             await LoadGamesAsync();
             NewGame();
             SetStatus(T("LocalLibraryCleared"));
@@ -1418,6 +1424,7 @@ public partial class MainWindow : Window
         var result = await _transferService.ImportZipAsync(localPath, ResolveImportConflict);
         await LoadReferencesAsync();
         await LoadGamesAsync();
+        await CleanupUnreferencedImagesAsync();
         SetStatus(FormatImportSummary(result));
     }
 
@@ -2250,6 +2257,18 @@ public partial class MainWindow : Window
         return string.Format(CultureInfo.CurrentCulture, T(key), result.Added, result.Replaced, result.Skipped);
     }
 
+    private async Task<ImageCleanupResult> CleanupUnreferencedImagesAsync()
+    {
+        await using var db = CreateDb();
+        return await _imageService.DeleteUnreferencedImagesAsync(db);
+    }
+
+    private string FormatImageCleanupSummary(ImageCleanupResult result)
+    {
+        var key = result.Failed == 0 ? "ImageCleanupSummary" : "ImageCleanupPartialSummary";
+        return string.Format(CultureInfo.CurrentCulture, T(key), result.Deleted, result.Scanned, result.Failed);
+    }
+
     private string StatusName(GameStatus status) => status switch
     {
         GameStatus.COMPLETED => T("StatusCompleted"),
@@ -2595,9 +2614,11 @@ public partial class MainWindow : Window
         ["UnableImportLibrary"] = "Не удалось импортировать библиотеку.",
         ["ImportCancelledSummary"] = "Импорт отменён. Добавлено: {0}, заменено: {1}, пропущено: {2}.",
         ["ImportCompleteSummary"] = "Импорт завершён. Добавлено: {0}, заменено: {1}, пропущено: {2}.",
-        ["ClearImageCacheQuestion"] = "Очистить все файлы локального кэша изображений?",
+        ["ClearImageCacheQuestion"] = "Удалить файлы изображений, не связанные ни с одной игрой?",
         ["UnableClearImageCache"] = "Не удалось очистить кэш изображений.",
         ["ImageCacheCleared"] = "Кэш изображений очищен.",
+        ["ImageCleanupSummary"] = "Очистка изображений: удалено {0} из {1} файлов.",
+        ["ImageCleanupPartialSummary"] = "Очистка изображений: удалено {0} из {1} файлов, не удалось удалить {2}.",
         ["ClearLibraryQuestion"] = "Удалить все локальные игры? Справочники и настройки будут сохранены.",
         ["UnableClearLibrary"] = "Не удалось очистить библиотеку.",
         ["LocalLibraryCleared"] = "Локальная библиотека очищена.",
@@ -2694,7 +2715,7 @@ public partial class MainWindow : Window
         ["Import JSON"] = "Импорт JSON",
         ["Import ZIP"] = "Импорт ZIP",
         ["Maintenance"] = "Обслуживание",
-        ["Clear image cache"] = "Очистить кэш изображений",
+        ["Clear image cache"] = "Очистить лишние изображения",
         ["Clear library"] = "Очистить библиотеку",
         ["Google Drive"] = "Google Диск",
         ["Connect account"] = "Подключить аккаунт",
@@ -2820,9 +2841,11 @@ public partial class MainWindow : Window
         ["UnableImportLibrary"] = "Unable to import library.",
         ["ImportCancelledSummary"] = "Import cancelled. Added: {0}, replaced: {1}, skipped: {2}.",
         ["ImportCompleteSummary"] = "Import complete. Added: {0}, replaced: {1}, skipped: {2}.",
-        ["ClearImageCacheQuestion"] = "Clear all files from local image cache?",
+        ["ClearImageCacheQuestion"] = "Delete image files that are not linked to any game?",
         ["UnableClearImageCache"] = "Unable to clear image cache.",
         ["ImageCacheCleared"] = "Image cache cleared.",
+        ["ImageCleanupSummary"] = "Image cleanup: deleted {0} of {1} files.",
+        ["ImageCleanupPartialSummary"] = "Image cleanup: deleted {0} of {1} files, failed to delete {2}.",
         ["ClearLibraryQuestion"] = "Delete all local games? References and settings will be kept.",
         ["UnableClearLibrary"] = "Unable to clear library.",
         ["LocalLibraryCleared"] = "Local library cleared.",
