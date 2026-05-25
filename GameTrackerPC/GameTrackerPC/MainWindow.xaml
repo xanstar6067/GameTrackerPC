@@ -439,17 +439,18 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Border Width="{DynamicResource GameCardCoverWidth}"
-                            Height="{DynamicResource GameCardCoverHeight}"
-                            VerticalAlignment="Top"
-                            Background="{DynamicResource SurfaceAltBrush}"
-                            BorderBrush="{DynamicResource BorderBrushSoft}"
-                            BorderThickness="1"
-                            ClipToBounds="True">
+                    <Grid Width="{DynamicResource GameCardCoverWidth}"
+                          Height="{DynamicResource GameCardCoverHeight}"
+                          VerticalAlignment="Top"
+                          Background="{DynamicResource SurfaceAltBrush}"
+                          ClipToBounds="True">
                         <Image Source="{Binding ImagePath}"
                                RenderOptions.BitmapScalingMode="HighQuality"
                                Stretch="UniformToFill" />
-                    </Border>
+                        <Border BorderBrush="{DynamicResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                IsHitTestVisible="False" />
+                    </Grid>
                     <StackPanel Grid.Column="1"
                                 Margin="{DynamicResource GameCardContentMargin}">
                         <TextBlock Text="{Binding Title}"
@@ -842,35 +843,51 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0"
+                                Width="300"
+                                HorizontalAlignment="Left"
                                 Margin="0,0,18,0">
-                        <Border Height="420"
-                                Background="{DynamicResource SurfaceAltBrush}"
-                                BorderBrush="{DynamicResource BorderBrushSoft}"
-                                BorderThickness="1"
-                                ClipToBounds="True"
-                                Margin="0,0,0,12"
-                                SizeChanged="CoverFrame_SizeChanged">
+                        <Grid x:Name="CoverFrame"
+                              Width="300"
+                              Height="450"
+                              Background="{DynamicResource SurfaceAltBrush}"
+                              ClipToBounds="True"
+                              Margin="0,0,0,12"
+                              SizeChanged="CoverFrame_SizeChanged">
                             <Image x:Name="CoverPreview"
                                    RenderTransformOrigin="0.5,0.5"
                                    RenderOptions.BitmapScalingMode="HighQuality"
                                    Stretch="UniformToFill" />
-                        </Border>
-                        <StackPanel Orientation="Horizontal">
+                            <Border BorderBrush="{DynamicResource BorderBrushSoft}"
+                                    BorderThickness="1"
+                                    IsHitTestVisible="False" />
+                        </Grid>
+                        <Grid Width="{Binding ActualWidth, ElementName=CoverFrame}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
                             <Button Content="Add cover"
+                                    Margin="0,0,10,10"
                                     Click="AddCoverLocalButton_Click" />
-                            <Button Content="Reload URL"
+                            <Button Grid.Column="1"
+                                    Content="Reload URL"
+                                    Margin="0,0,0,10"
                                     Style="{StaticResource SecondaryButton}"
                                     Click="ReloadCoverButton_Click" />
-                        </StackPanel>
+                        </Grid>
                         <TextBlock Text="Image URL"
                                    Style="{StaticResource LabelText}" />
                         <TextBox x:Name="CoverUrlBox"
+                                 Width="{Binding ActualWidth, ElementName=CoverFrame}"
                                  ToolTip="Image URL" />
                         <Button Content="Download cover URL"
+                                Width="{Binding ActualWidth, ElementName=CoverFrame}"
+                                Margin="0,0,0,10"
                                 Style="{StaticResource SecondaryButton}"
                                 Click="DownloadCoverButton_Click" />
                         <Button Content="Save"
-                                Margin="0,8,10,10"
+                                Width="{Binding ActualWidth, ElementName=CoverFrame}"
+                                Margin="0,8,0,10"
                                 Click="SaveGameButton_Click" />
                     </StackPanel>
 
@@ -1147,20 +1164,24 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0"
+                                Width="320"
+                                HorizontalAlignment="Left"
                                 Margin="0,0,18,0">
-                        <Border x:Name="DetailsCoverFrame"
-                                Height="470"
-                                Background="{DynamicResource SurfaceAltBrush}"
-                                BorderBrush="{DynamicResource BorderBrushSoft}"
-                                BorderThickness="1"
-                                ClipToBounds="True"
-                                Margin="0,0,0,14"
-                                SizeChanged="CoverFrame_SizeChanged">
+                        <Grid x:Name="DetailsCoverFrame"
+                              Width="320"
+                              Height="480"
+                              Background="{DynamicResource SurfaceAltBrush}"
+                              ClipToBounds="True"
+                              Margin="0,0,0,14"
+                              SizeChanged="CoverFrame_SizeChanged">
                             <Image x:Name="DetailsCoverPreview"
                                    RenderTransformOrigin="0.5,0.5"
                                    RenderOptions.BitmapScalingMode="HighQuality"
                                    Stretch="UniformToFill" />
-                        </Border>
+                            <Border BorderBrush="{DynamicResource BorderBrushSoft}"
+                                    BorderThickness="1"
+                                    IsHitTestVisible="False" />
+                        </Grid>
                         <Button Content="Edit"
                                 Width="{Binding ActualWidth, ElementName=DetailsCoverFrame}"
                                 Margin="0"

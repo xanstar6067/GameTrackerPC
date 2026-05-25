@@ -1495,8 +1495,9 @@ public partial class MainWindow : Window
         Resources["GameCardSubtitleMargin"] = new Thickness(0, 4 * _cardScale, 0, 0);
         Resources["GameCardChipMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
         Resources["GameCardUpdatedMargin"] = new Thickness(0, 8 * _cardScale, 0, 0);
-        Resources["GameCardCoverWidth"] = 68 * _cardScale;
-        Resources["GameCardCoverHeight"] = 92 * _cardScale;
+        var coverWidth = 68 * _cardScale;
+        Resources["GameCardCoverWidth"] = coverWidth;
+        Resources["GameCardCoverHeight"] = coverWidth / CoverAspectRatio;
         Resources["GameCardHeight"] = 132 * _cardScale;
         Resources["GameCardTitleFontSize"] = 15 * _cardScale;
         Resources["GameCardSmallFontSize"] = 11 * _cardScale;
@@ -2317,6 +2318,7 @@ public partial class MainWindow : Window
     private const double MinCardScale = 0.75;
     private const double MaxCardScale = 4;
     private const double DefaultCardScale = 1.0;
+    private const double CoverAspectRatio = 2d / 3d;
     private const string RussianLanguage = "ru";
     private const string EnglishLanguage = "en";
 
