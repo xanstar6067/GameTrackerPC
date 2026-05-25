@@ -226,7 +226,11 @@ public partial class MainWindow : Window
                 Statuses = FormatStatuses(game.Statuses.Select(item => item.Status)),
                 YearText = game.Year?.ToString(CultureInfo.InvariantCulture) ?? "-",
                 UpdatedText = string.Format(CultureInfo.CurrentCulture, T("UpdatedAt"), FormatTimestamp(game.UpdatedAt)),
-                ImagePath = imagePath
+                ImagePath = imagePath,
+                CoverPreview = CreateCoverPreview(imagePath, game.ImageScale, game.ImageOffsetX, game.ImageOffsetY),
+                ImageScale = game.ImageScale,
+                ImageOffsetX = game.ImageOffsetX,
+                ImageOffsetY = game.ImageOffsetY
             });
         }
 
@@ -2052,6 +2056,56 @@ public partial class MainWindow : Window
 
     private static double PixelsToOffset(double pixels, double maxPan) =>
         maxPan <= 0 ? 0 : Clamp(pixels, -maxPan, maxPan) / maxPan * 2;
+
+    private static ImageSource? CreateCoverPreview(string? path, double scale, double offsetX, double offsetY)
+    {
+        var bitmap = LoadBitmap(path);
+        if (bitmap is null)
+        {
+            return null;
+        }
+
+        const int targetWidth = 300;
+        const int targetHeight = 400;
+        var normalizedScale = Clamp(scale, 1, 4);
+        var imageAspect = bitmap.PixelWidth / (double)bitmap.PixelHeight;
+        var frameAspect = targetWidth / (double)targetHeight;
+        double baseWidth;
+        double baseHeight;
+        if (imageAspect > frameAspect)
+        {
+            baseWidth = targetWidth;
+            baseHeight = targetWidth / imageAspect;
+        }
+        else
+        {
+            baseHeight = targetHeight;
+            baseWidth = targetHeight * imageAspect;
+        }
+
+        var renderedWidth = baseWidth * normalizedScale;
+        var renderedHeight = baseHeight * normalizedScale;
+        var maxPanX = Math.Max(0, (renderedWidth - targetWidth) / 2);
+        var maxPanY = Math.Max(0, (renderedHeight - targetHeight) / 2);
+        var translateX = OffsetToPixels(offsetX, maxPanX);
+        var translateY = OffsetToPixels(offsetY, maxPanY);
+        var rect = new Rect(
+            (targetWidth - renderedWidth) / 2 + translateX,
+            (targetHeight - renderedHeight) / 2 + translateY,
+            renderedWidth,
+            renderedHeight);
+
+        var visual = new DrawingVisual();
+        using (var context = visual.RenderOpen())
+        {
+            context.DrawImage(bitmap, rect);
+        }
+
+        var preview = new RenderTargetBitmap(targetWidth, targetHeight, 96, 96, PixelFormats.Pbgra32);
+        preview.Render(visual);
+        preview.Freeze();
+        return preview;
+    }
 
     private void SetLanguage(string language)
     {

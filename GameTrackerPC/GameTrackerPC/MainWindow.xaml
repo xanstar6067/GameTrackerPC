@@ -444,9 +444,9 @@
                           VerticalAlignment="Top"
                           Background="{DynamicResource SurfaceAltBrush}"
                           ClipToBounds="True">
-                        <Image Source="{Binding ImagePath}"
+                        <Image Source="{Binding CoverPreview}"
                                RenderOptions.BitmapScalingMode="HighQuality"
-                               Stretch="UniformToFill" />
+                               Stretch="Fill" />
                         <Border BorderBrush="{DynamicResource BorderBrushSoft}"
                                 BorderThickness="1"
                                 IsHitTestVisible="False" />
