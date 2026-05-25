@@ -1,5 +1,6 @@
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
+using Google.Apis.Download;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Google.Apis.Upload;
@@ -173,12 +174,29 @@ public sealed class GoogleDriveBackupService
     public async Task<string> DownloadBackupAsync(
         string fileId,
         string destinationPath,
+        long? totalBytes = null,
+        IProgress<DownloadProgress>? downloadProgress = null,
         CancellationToken cancellationToken = default)
     {
         var service = RequireService();
         await using var stream = File.Create(destinationPath);
         var request = service.Files.Get(fileId);
-        await request.DownloadAsync(stream, cancellationToken);
+        downloadProgress?.Report(new DownloadProgress(0, totalBytes));
+        request.MediaDownloader.ProgressChanged += progress =>
+        {
+            if (progress.Status == DownloadStatus.Downloading)
+            {
+                downloadProgress?.Report(new DownloadProgress(progress.BytesDownloaded, totalBytes));
+            }
+        };
+
+        var progress = await request.DownloadAsync(stream, cancellationToken);
+        if (progress.Status == DownloadStatus.Failed)
+        {
+            throw progress.Exception ?? new InvalidOperationException("Google Drive download failed.");
+        }
+
+        downloadProgress?.Report(new DownloadProgress(totalBytes ?? progress.BytesDownloaded, totalBytes));
         return destinationPath;
     }
 

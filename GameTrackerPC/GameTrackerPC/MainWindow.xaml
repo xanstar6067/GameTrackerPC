@@ -561,6 +561,16 @@
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right">
+                    <ProgressBar x:Name="DownloadProgressBar"
+                                 Width="140"
+                                 Height="8"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Visibility="Collapsed"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,10,0"
+                                 Foreground="{DynamicResource PrimaryBrush}"
+                                 Background="{DynamicResource InputBrush}" />
                     <TextBlock x:Name="StatusText"
                                Text="Ready"
                                Foreground="{DynamicResource MutedTextBrush}"

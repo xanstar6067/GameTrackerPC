@@ -36,22 +36,43 @@ public sealed class ImageService
         return destination;
     }
 
-    public async Task<string> DownloadImageAsync(string url, CancellationToken cancellationToken = default)
+    public async Task<string> DownloadImageAsync(
+        string url,
+        IProgress<DownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             throw new InvalidOperationException("Image URL must be absolute.");
         }
 
-        using var response = await _httpClient.GetAsync(uri, cancellationToken);
+        using var response = await _httpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var extension = GuessExtension(response.Content.Headers.ContentType?.MediaType, uri.LocalPath);
         Directory.CreateDirectory(AppPaths.ImagesDirectory);
         var destination = Path.Combine(AppPaths.ImagesDirectory, $"{Guid.NewGuid():N}{extension}");
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        await using var file = File.Create(destination);
-        await stream.CopyToAsync(file, cancellationToken);
+        try
+        {
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using var file = File.Create(destination);
+            await CopyToFileWithProgressAsync(
+                stream,
+                file,
+                response.Content.Headers.ContentLength,
+                progress,
+                cancellationToken);
+        }
+        catch
+        {
+            if (File.Exists(destination))
+            {
+                File.Delete(destination);
+            }
+
+            throw;
+        }
+
         return destination;
     }
 
@@ -93,5 +114,30 @@ public sealed class ImageService
         };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("GameVault/1.0");
         return client;
+    }
+
+    private static async Task CopyToFileWithProgressAsync(
+        Stream source,
+        Stream destination,
+        long? totalBytes,
+        IProgress<DownloadProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        var downloaded = 0L;
+        progress?.Report(new DownloadProgress(downloaded, totalBytes));
+
+        while (true)
+        {
+            var read = await source.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+            downloaded += read;
+            progress?.Report(new DownloadProgress(downloaded, totalBytes));
+        }
     }
 }

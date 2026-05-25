@@ -890,8 +890,16 @@ public partial class MainWindow : Window
 
         await RunUiActionAsync(T("UnableDownloadCover"), async () =>
         {
-            var downloaded = await _imageService.DownloadImageAsync(url);
-            await UpdateCoverAsync(downloaded, Path.GetFileName(downloaded), url, ImageSourceType.DIRECT_IMAGE_URL);
+            var progress = CreateDownloadProgress(T("DownloadCoverProgress"));
+            try
+            {
+                var downloaded = await _imageService.DownloadImageAsync(url, progress);
+                await UpdateCoverAsync(downloaded, Path.GetFileName(downloaded), url, ImageSourceType.DIRECT_IMAGE_URL);
+            }
+            finally
+            {
+                ClearDownloadProgress();
+            }
         });
     }
 
@@ -907,8 +915,16 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException(T("CoverHasNoSourceUrl"));
             }
 
-            var downloaded = await _imageService.DownloadImageAsync(game.ImageSourceUrl);
-            await UpdateCoverAsync(downloaded, Path.GetFileName(downloaded), game.ImageSourceUrl, ImageSourceType.DIRECT_IMAGE_URL);
+            var progress = CreateDownloadProgress(T("DownloadCoverProgress"));
+            try
+            {
+                var downloaded = await _imageService.DownloadImageAsync(game.ImageSourceUrl, progress);
+                await UpdateCoverAsync(downloaded, Path.GetFileName(downloaded), game.ImageSourceUrl, ImageSourceType.DIRECT_IMAGE_URL);
+            }
+            finally
+            {
+                ClearDownloadProgress();
+            }
         });
     }
 
@@ -956,9 +972,17 @@ public partial class MainWindow : Window
 
         await RunUiActionAsync(T("UnableDownloadGalleryImage"), async () =>
         {
-            var downloaded = await _imageService.DownloadImageAsync(url);
-            await AddGalleryImageAsync(downloaded, Path.GetFileName(downloaded), url, ImageSourceType.DIRECT_IMAGE_URL);
-            GalleryUrlBox.Text = string.Empty;
+            var progress = CreateDownloadProgress(T("DownloadGalleryProgress"));
+            try
+            {
+                var downloaded = await _imageService.DownloadImageAsync(url, progress);
+                await AddGalleryImageAsync(downloaded, Path.GetFileName(downloaded), url, ImageSourceType.DIRECT_IMAGE_URL);
+                GalleryUrlBox.Text = string.Empty;
+            }
+            finally
+            {
+                ClearDownloadProgress();
+            }
         });
     }
 
@@ -1351,7 +1375,17 @@ public partial class MainWindow : Window
     private async Task RestoreDriveBackupCoreAsync(DriveBackupFile backup)
     {
         var localPath = Path.Combine(GetBackupFolder(), $"restore-{DateTime.Now:yyyyMMdd-HHmmss}-{backup.Name}");
-        await _driveService.DownloadBackupAsync(backup.Id, localPath);
+        var progress = CreateDownloadProgress(T("DownloadBackupProgress"));
+        try
+        {
+            await _driveService.DownloadBackupAsync(backup.Id, localPath, backup.Size, progress);
+        }
+        finally
+        {
+            ClearDownloadProgress();
+        }
+
+        SetStatus(T("ImportingBackup"));
         var result = await _transferService.ImportZipAsync(localPath, ResolveImportConflict);
         await LoadReferencesAsync();
         await LoadGamesAsync();
@@ -2150,6 +2184,44 @@ public partial class MainWindow : Window
         StatusText.Text = message;
     }
 
+    private IProgress<DownloadProgress> CreateDownloadProgress(string label)
+    {
+        DownloadProgressBar.Visibility = Visibility.Visible;
+        DownloadProgressBar.Value = 0;
+        SetStatus(label);
+        return new Progress<DownloadProgress>(progress => SetDownloadProgress(label, progress));
+    }
+
+    private void SetDownloadProgress(string label, DownloadProgress progress)
+    {
+        if (progress.Percent is double percent)
+        {
+            DownloadProgressBar.Visibility = Visibility.Visible;
+            DownloadProgressBar.Value = Math.Clamp(percent, 0, 100);
+            SetStatus(string.Format(
+                CultureInfo.CurrentCulture,
+                T("DownloadProgressKnown"),
+                label,
+                percent,
+                FormatByteSize(progress.BytesDownloaded),
+                FormatByteSize(progress.TotalBytes!.Value)));
+            return;
+        }
+
+        DownloadProgressBar.Visibility = Visibility.Collapsed;
+        SetStatus(string.Format(
+            CultureInfo.CurrentCulture,
+            T("DownloadProgressUnknown"),
+            label,
+            FormatByteSize(progress.BytesDownloaded)));
+    }
+
+    private void ClearDownloadProgress()
+    {
+        DownloadProgressBar.Value = 0;
+        DownloadProgressBar.Visibility = Visibility.Collapsed;
+    }
+
     private void ShowError(string title, Exception ex)
     {
         SetStatus($"{title} {ex.Message}");
@@ -2164,6 +2236,25 @@ public partial class MainWindow : Window
         }
 
         return DateTimeOffset.FromUnixTimeMilliseconds(timestamp).LocalDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatByteSize(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        var kb = bytes / 1024d;
+        if (kb < 1024)
+        {
+            return $"{kb:0.0} KB";
+        }
+
+        var mb = kb / 1024d;
+        return mb < 1024
+            ? $"{mb:0.0} MB"
+            : $"{mb / 1024d:0.0} GB";
     }
 
     private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -2308,6 +2399,12 @@ public partial class MainWindow : Window
         ["MoveBackupToTrashQuestion"] = "Переместить «{0}» в корзину Google Диска?",
         ["UnableMoveBackupTrash"] = "Не удалось переместить резервную копию в корзину.",
         ["BackupMovedTrash"] = "Резервная копия перемещена в корзину Google Диска.",
+        ["DownloadCoverProgress"] = "Скачивание обложки",
+        ["DownloadGalleryProgress"] = "Скачивание изображения",
+        ["DownloadBackupProgress"] = "Скачивание резервной копии",
+        ["DownloadProgressKnown"] = "{0}: {1:0}% ({2} из {3})",
+        ["DownloadProgressUnknown"] = "{0}: скачано {1}",
+        ["ImportingBackup"] = "Импорт резервной копии...",
         ["DriveConnectedAutomatically"] = "Google Диск подключён автоматически.",
         ["DriveTokenInvalid"] = "Токен Google Диска отсутствует, истёк или больше недействителен. Нажмите «Подключить аккаунт», чтобы войти снова.",
         ["DriveNotAuthenticatedStartup"] = "Google Диск ещё не авторизован. Один раз нажмите «Подключить аккаунт», после этого будущие запуски будут подключаться автоматически.",
@@ -2526,6 +2623,12 @@ public partial class MainWindow : Window
         ["MoveBackupToTrashQuestion"] = "Move '{0}' to Google Drive trash?",
         ["UnableMoveBackupTrash"] = "Unable to move backup to trash.",
         ["BackupMovedTrash"] = "Backup moved to Google Drive trash.",
+        ["DownloadCoverProgress"] = "Downloading cover",
+        ["DownloadGalleryProgress"] = "Downloading image",
+        ["DownloadBackupProgress"] = "Downloading backup",
+        ["DownloadProgressKnown"] = "{0}: {1:0}% ({2} of {3})",
+        ["DownloadProgressUnknown"] = "{0}: downloaded {1}",
+        ["ImportingBackup"] = "Importing backup...",
         ["DriveConnectedAutomatically"] = "Google Drive connected automatically.",
         ["DriveTokenInvalid"] = "Google Drive token is missing, expired, or no longer valid. Use Connect account to sign in again.",
         ["DriveNotAuthenticatedStartup"] = "Google Drive is not authenticated yet. Use Connect account once, then future starts will connect automatically.",
