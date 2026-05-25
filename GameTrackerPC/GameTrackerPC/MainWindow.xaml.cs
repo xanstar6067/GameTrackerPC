@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using System.Windows.Media.Imaging;
@@ -268,9 +269,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        await OpenGameDetailsAsync(item.Id);
+    }
+
+    private async void GameItem_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_loading || sender is not ListBoxItem { IsSelected: true, DataContext: GameListItem item })
+        {
+            return;
+        }
+
+        await OpenGameDetailsAsync(item.Id);
+    }
+
+    private async Task OpenGameDetailsAsync(string gameId)
+    {
         await RunUiActionAsync(T("UnableLoadGame"), async () =>
         {
-            await LoadGameIntoEditorAsync(item.Id);
+            await LoadGameIntoEditorAsync(gameId);
             Navigate(AppScreen.Details);
         });
     }
@@ -1563,6 +1579,7 @@ public partial class MainWindow : Window
         style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
         style.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("TextBrush")));
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        style.Setters.Add(new EventSetter(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(GameItem_PreviewMouseLeftButtonDown)));
         if (mode == LibraryViewMode.Tiles)
         {
             style.Setters.Add(new Setter(FrameworkElement.WidthProperty, 250d * _cardScale));
