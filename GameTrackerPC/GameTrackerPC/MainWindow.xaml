@@ -647,10 +647,29 @@
                                FontSize="18"
                                Foreground="{DynamicResource MutedTextBrush}"
                                Margin="4,8,0,36" />
-                    <Button Content="Start"
-                            Width="260"
-                            HorizontalAlignment="Left"
-                            Click="StartButton_Click" />
+                    <StackPanel HorizontalAlignment="Left">
+                        <Button Content="New record"
+                                Width="260"
+                                Height="38"
+                                HorizontalAlignment="Left"
+                                Click="NewGameButton_Click" />
+                        <Button Content="Database"
+                                Width="260"
+                                Height="38"
+                                HorizontalAlignment="Left"
+                                Click="OpenDatabaseButton_Click" />
+                        <Button Content="Settings"
+                                Width="260"
+                                Height="38"
+                                HorizontalAlignment="Left"
+                                Click="OpenSettingsButton_Click" />
+                        <Button Content="Exit"
+                                Width="260"
+                                Height="38"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource DangerButton}"
+                                Click="ExitButton_Click" />
+                    </StackPanel>
                 </StackPanel>
                 <Border Grid.Column="1"
                         Style="{StaticResource CyberPanel}"

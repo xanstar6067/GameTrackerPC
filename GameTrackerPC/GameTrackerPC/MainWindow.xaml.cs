@@ -461,7 +461,7 @@ public partial class MainWindow : Window
     private void Home()
     {
         _navigationStack.Clear();
-        ShowScreen(AppScreen.Menu);
+        ShowScreen(AppScreen.Start);
     }
 
     private void ShowScreen(AppScreen screen, bool animate = true)
