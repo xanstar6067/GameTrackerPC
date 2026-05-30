@@ -1653,6 +1653,10 @@ public partial class MainWindow : Window
         Resources["AppHeaderControlHeight"] = 36 * _uiFontScale;
         Resources["AppStartButtonHeight"] = 48 * _uiFontScale;
         Resources["AppColorSwatchWidth"] = 38 * _uiFontScale;
+        Resources["AppScaleStepButtonWidth"] = 42 * _uiFontScale;
+        Resources["AppScaleValueColumnWidth"] = 76 * _uiFontScale;
+        Resources["AppFontScaleGridWidth"] = Math.Min(1040d, 620d + 210d * (_uiFontScale - DefaultUiFontScale));
+        Resources["AppCardScaleControlFontSize"] = 13 * Math.Min(_uiFontScale, MaxCardScale);
         Resources["AppButtonPadding"] = new Thickness(16 * _uiFontScale, 9 * _uiFontScale, 16 * _uiFontScale, 9 * _uiFontScale);
         Resources["AppHeaderButtonPadding"] = new Thickness(14 * _uiFontScale, 0, 14 * _uiFontScale, 0);
         Resources["AppInputPadding"] = new Thickness(10 * _uiFontScale, 6 * _uiFontScale, 10 * _uiFontScale, 6 * _uiFontScale);
@@ -3123,7 +3127,7 @@ public partial class MainWindow : Window
 
     private const int MaxAutoGalleryImages = 20;
     private const double MinCardScale = 0.75;
-    private const double MaxCardScale = 4;
+    private const double MaxCardScale = 1.5;
     private const double DefaultCardScale = 1.0;
     private const double MinUiFontScale = 0.8;
     private const double MaxUiFontScale = 3;

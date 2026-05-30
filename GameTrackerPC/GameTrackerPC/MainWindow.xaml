@@ -29,6 +29,10 @@
         <sys:Double x:Key="AppHeaderControlHeight">36</sys:Double>
         <sys:Double x:Key="AppStartButtonHeight">48</sys:Double>
         <sys:Double x:Key="AppColorSwatchWidth">38</sys:Double>
+        <sys:Double x:Key="AppScaleStepButtonWidth">42</sys:Double>
+        <sys:Double x:Key="AppScaleValueColumnWidth">76</sys:Double>
+        <sys:Double x:Key="AppFontScaleGridWidth">620</sys:Double>
+        <sys:Double x:Key="AppCardScaleControlFontSize">13</sys:Double>
         <Thickness x:Key="AppButtonPadding">16,9</Thickness>
         <Thickness x:Key="AppHeaderButtonPadding">14,0</Thickness>
         <Thickness x:Key="AppInputPadding">10,6</Thickness>
@@ -849,11 +853,13 @@
                             <TextBlock Text="Scale"
                                        HorizontalAlignment="Center"
                                        Margin="0,0,0,8"
+                                       FontSize="{DynamicResource AppCardScaleControlFontSize}"
                                        Style="{StaticResource MutedText}" />
                             <Button Grid.Row="1"
                                     Content="+"
                                     Width="48"
                                     Height="36"
+                                    FontSize="{DynamicResource AppCardScaleControlFontSize}"
                                     Margin="0,0,0,10"
                                     Padding="0"
                                     HorizontalAlignment="Center"
@@ -864,7 +870,7 @@
                                     HorizontalAlignment="Center"
                                     Style="{StaticResource CardScaleSliderStyle}"
                                     Minimum="0.75"
-                                    Maximum="4"
+                                    Maximum="1.5"
                                     Value="1"
                                     TickFrequency="0.01"
                                     SmallChange="0.01"
@@ -877,12 +883,13 @@
                                        Grid.Row="3"
                                        HorizontalAlignment="Center"
                                        Margin="0,8,0,8"
-                                       FontSize="{DynamicResource AppMutedFontSize}"
+                                       FontSize="{DynamicResource AppCardScaleControlFontSize}"
                                        Foreground="{DynamicResource MutedTextBrush}" />
                             <Button Grid.Row="4"
                                     Content="-"
                                     Width="48"
                                     Height="36"
+                                    FontSize="{DynamicResource AppCardScaleControlFontSize}"
                                     Margin="0"
                                     Padding="0"
                                     HorizontalAlignment="Center"
@@ -1457,7 +1464,7 @@
             <ScrollViewer x:Name="SettingsScreen"
                           Visibility="Collapsed"
                           VerticalScrollBarVisibility="Auto">
-                <StackPanel MaxWidth="900"
+                <StackPanel MaxWidth="1100"
                             HorizontalAlignment="Center">
                     <Border Style="{StaticResource CyberPanel}">
                         <StackPanel>
@@ -1487,24 +1494,24 @@
                         <StackPanel>
                             <TextBlock Text="Font size"
                                        Style="{StaticResource SectionTitle}" />
-                            <Grid MaxWidth="520"
+                            <Grid Width="{DynamicResource AppFontScaleGridWidth}"
                                   HorizontalAlignment="Left">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <Button Content="-"
-                                        Width="42"
+                                        Width="{DynamicResource AppScaleStepButtonWidth}"
                                         Height="{DynamicResource AppHeaderControlHeight}"
                                         Margin="0,0,10,0"
                                         Padding="0"
                                         Click="DecreaseUiFontScaleButton_Click" />
                                 <Slider x:Name="UiFontScaleSlider"
                                         Grid.Column="1"
-                                        MinWidth="260"
+                                        MinWidth="220"
                                         VerticalAlignment="Center"
                                         Minimum="0.8"
                                         Maximum="3"
@@ -1517,13 +1524,14 @@
                                         ValueChanged="UiFontScaleSlider_ValueChanged" />
                                 <Button Grid.Column="2"
                                         Content="+"
-                                        Width="42"
+                                        Width="{DynamicResource AppScaleStepButtonWidth}"
                                         Height="{DynamicResource AppHeaderControlHeight}"
                                         Margin="10,0,0,0"
                                         Padding="0"
                                         Click="IncreaseUiFontScaleButton_Click" />
                                 <TextBlock x:Name="UiFontScaleValueText"
                                            Grid.Column="3"
+                                           MinWidth="{DynamicResource AppScaleValueColumnWidth}"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Right"
                                            Margin="14,0,0,0"
