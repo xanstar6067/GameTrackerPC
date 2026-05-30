@@ -52,6 +52,8 @@
         <SolidColorBrush x:Key="SecondaryBrush" Color="#FFCC33" />
         <SolidColorBrush x:Key="ButtonTextBrush" Color="#061019" />
         <SolidColorBrush x:Key="DangerBrush" Color="#FF4D6D" />
+        <SolidColorBrush x:Key="ExitIdleBrush" Color="#95FFFF" />
+        <SolidColorBrush x:Key="ExitHoverBrush" Color="#E5242A" />
         <SolidColorBrush x:Key="InputBrush" Color="#0E1A2C" />
         <SolidColorBrush x:Key="InputTextBrush" Color="#F8FAFC" />
         <SolidColorBrush x:Key="ChipBrush" Color="#163D48" />
@@ -116,6 +118,48 @@
             <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
             <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <Style x:Key="ExitButton" TargetType="{x:Type Button}" BasedOn="{StaticResource CyberButton}">
+            <Setter Property="Background" Value="{DynamicResource ExitIdleBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ExitIdleBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Grid SnapsToDevicePixels="True">
+                            <Border x:Name="Chrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" />
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ExitHoverBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource ExitHoverBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource ExitHoverBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource ExitHoverBrush}" />
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform X="1" Y="1" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="HeaderButton" TargetType="{x:Type Button}" BasedOn="{StaticResource CyberButton}">
@@ -668,7 +712,7 @@
                                 Width="390"
                                 Height="{DynamicResource AppStartButtonHeight}"
                                 HorizontalAlignment="Left"
-                                Style="{StaticResource DangerButton}"
+                                Style="{StaticResource ExitButton}"
                                 Click="ExitButton_Click" />
                     </StackPanel>
                 </StackPanel>
@@ -715,7 +759,7 @@
                     <Button Content="Exit"
                             Margin="12"
                             FontSize="{DynamicResource AppMenuButtonFontSize}"
-                            Style="{StaticResource SecondaryButton}"
+                            Style="{StaticResource ExitButton}"
                             Click="ExitButton_Click" />
                 </UniformGrid>
             </Grid>

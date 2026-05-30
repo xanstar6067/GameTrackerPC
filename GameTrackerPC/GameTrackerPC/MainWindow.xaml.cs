@@ -1869,6 +1869,7 @@ public partial class MainWindow : Window
         SetBrush("SecondaryBrush", palette.Secondary);
         SetBrush("ButtonTextBrush", palette.ButtonText);
         SetBrush("DangerBrush", palette.Danger);
+        SetBrush("ExitIdleBrush", Shade(palette.Primary, 1.54));
         SetBrush("InputBrush", Shade(palette.Panel, 1.08));
         SetBrush("InputTextBrush", palette.Text);
         SetBrush("ChipBrush", Blend(palette.Primary, palette.Panel, 0.22));
