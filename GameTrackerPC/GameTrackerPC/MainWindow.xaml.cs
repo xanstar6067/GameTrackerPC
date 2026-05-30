@@ -1852,6 +1852,7 @@ public partial class MainWindow : Window
         SetBrush("InputBrush", Shade(palette.Panel, 1.08));
         SetBrush("InputTextBrush", palette.Text);
         SetBrush("ChipBrush", Blend(palette.Primary, palette.Panel, 0.22));
+        SetBrush("GameCardHoverBrush", Blend(palette.Primary, palette.Surface, 0.14));
         Background = (Brush)Resources["AppBackgroundBrush"];
     }
 

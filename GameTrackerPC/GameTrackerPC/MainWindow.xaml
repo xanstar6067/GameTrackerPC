@@ -55,6 +55,7 @@
         <SolidColorBrush x:Key="InputBrush" Color="#0E1A2C" />
         <SolidColorBrush x:Key="InputTextBrush" Color="#F8FAFC" />
         <SolidColorBrush x:Key="ChipBrush" Color="#163D48" />
+        <SolidColorBrush x:Key="GameCardHoverBrush" Color="#162A3A" />
 
         <Style x:Key="CyberButton" TargetType="{x:Type Button}">
             <Setter Property="Padding" Value="{DynamicResource AppButtonPadding}" />
@@ -427,8 +428,8 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource BorderBrushSoft}" />
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="Transparent" />
+                                <Setter TargetName="Chrome" Property="Background" Value="Transparent" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="Transparent" />
@@ -490,7 +491,8 @@
         </Style>
 
         <DataTemplate x:Key="GameCardTemplate" DataType="{x:Type models:GameListItem}">
-            <Border BorderBrush="{DynamicResource BorderBrushSoft}"
+            <Border x:Name="CardChrome"
+                    BorderBrush="{DynamicResource BorderBrushSoft}"
                     BorderThickness="1"
                     Height="{DynamicResource GameCardHeight}"
                     Padding="{DynamicResource GameCardPadding}"
@@ -545,6 +547,14 @@
                     </StackPanel>
                 </Grid>
             </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}" Value="True">
+                    <Setter TargetName="CardChrome" Property="Background" Value="{DynamicResource GameCardHoverBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}" Value="True">
+                    <Setter TargetName="CardChrome" Property="Background" Value="{DynamicResource ChipBrush}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
         <ItemsPanelTemplate x:Key="ListPanelTemplate">
