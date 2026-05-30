@@ -1649,6 +1649,15 @@ public partial class MainWindow : Window
         Resources["AppMenuButtonFontSize"] = 24 * _uiFontScale;
         Resources["AppDetailTitleFontSize"] = 34 * _uiFontScale;
         Resources["AppHeroFontSize"] = 68 * _uiFontScale;
+        Resources["AppControlMinHeight"] = 38 * _uiFontScale;
+        Resources["AppHeaderControlHeight"] = 36 * _uiFontScale;
+        Resources["AppStartButtonHeight"] = 48 * _uiFontScale;
+        Resources["AppColorSwatchWidth"] = 38 * _uiFontScale;
+        Resources["AppButtonPadding"] = new Thickness(16 * _uiFontScale, 9 * _uiFontScale, 16 * _uiFontScale, 9 * _uiFontScale);
+        Resources["AppHeaderButtonPadding"] = new Thickness(14 * _uiFontScale, 0, 14 * _uiFontScale, 0);
+        Resources["AppInputPadding"] = new Thickness(10 * _uiFontScale, 6 * _uiFontScale, 10 * _uiFontScale, 6 * _uiFontScale);
+        Resources["AppComboBoxPadding"] = new Thickness(8 * _uiFontScale, 5 * _uiFontScale, 8 * _uiFontScale, 5 * _uiFontScale);
+        Resources["AppComboBoxItemPadding"] = new Thickness(10 * _uiFontScale, 7 * _uiFontScale, 10 * _uiFontScale, 7 * _uiFontScale);
         SetUiFontScaleValueText(_uiFontScale);
     }
 
