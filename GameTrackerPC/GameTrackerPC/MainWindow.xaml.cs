@@ -471,13 +471,33 @@ public partial class MainWindow : Window
             return;
         }
 
-        ShowScreen(_navigationStack.Pop());
+        var previousScreen = _currentScreen;
+        var targetScreen = _navigationStack.Pop();
+        if (previousScreen == AppScreen.Details && targetScreen == AppScreen.Database)
+        {
+            ClearGameSelection();
+        }
+
+        ShowScreen(targetScreen);
     }
 
     private void Home()
     {
         _navigationStack.Clear();
         ShowScreen(AppScreen.Start);
+    }
+
+    private void ClearGameSelection()
+    {
+        _suppressGameSelectionNavigation = true;
+        try
+        {
+            GamesList.SelectedItem = null;
+        }
+        finally
+        {
+            _suppressGameSelectionNavigation = false;
+        }
     }
 
     private void ShowScreen(AppScreen screen, bool animate = true)
