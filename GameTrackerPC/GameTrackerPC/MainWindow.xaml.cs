@@ -35,11 +35,14 @@ public partial class MainWindow : Window
     private bool _updatingThemeControls;
     private bool _suppressGameSelectionNavigation;
     private bool _suppressCardScaleSave;
+    private bool _suppressUiFontScaleSave;
+    private bool _deferUiFontScaleApply;
     private bool _coverEditMode;
     private bool _coverDragActive;
     private Point _coverDragStart;
     private LibraryViewMode _viewMode = LibraryViewMode.List;
     private double _cardScale = DefaultCardScale;
+    private double _uiFontScale = DefaultUiFontScale;
     private double _imageScale = 1;
     private double _imageOffsetX;
     private double _imageOffsetY;
@@ -111,11 +114,15 @@ public partial class MainWindow : Window
         ThemeBox.SelectedValuePath = nameof(UiOption<string>.Value);
         ThemeEditorThemeBox.DisplayMemberPath = nameof(UiOption<string>.Text);
         ThemeEditorThemeBox.SelectedValuePath = nameof(UiOption<string>.Value);
+        UiFontScaleSlider.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler(UiFontScaleSlider_DragCompleted));
+        UiFontScaleSlider.AddHandler(MouseLeftButtonDownEvent, new MouseButtonEventHandler(UiFontScaleSlider_MouseLeftButtonDown), true);
+        UiFontScaleSlider.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler(UiFontScaleSlider_MouseLeftButtonUp), true);
         RefreshOptionControls();
         RefreshThemeControls();
         AutoAddSourceBox.ItemsSource = _autoAddService.SupportedSources;
         AutoAddSourceBox.SelectedItem = AutoAddSource.Steam;
         SetCoverCrop(1, 0, 0);
+        ApplyUiFontScale(_uiFontScale);
         ApplyCardScale(_cardScale);
         ShowScreen(AppScreen.Start, animate: false);
     }
@@ -138,6 +145,15 @@ public partial class MainWindow : Window
         CardScaleSlider.Value = _cardScale;
         ApplyCardScale(_cardScale);
         _suppressCardScaleSave = false;
+
+        var uiFontScaleText = await GetSettingAsync(db, AppSettingKeys.UiFontScale, DefaultUiFontScale.ToString(CultureInfo.InvariantCulture));
+        _uiFontScale = double.TryParse(uiFontScaleText, NumberStyles.Float, CultureInfo.InvariantCulture, out var uiFontScale)
+            ? Clamp(uiFontScale, MinUiFontScale, MaxUiFontScale)
+            : DefaultUiFontScale;
+        _suppressUiFontScaleSave = true;
+        UiFontScaleSlider.Value = _uiFontScale;
+        ApplyUiFontScale(_uiFontScale);
+        _suppressUiFontScaleSave = false;
         ApplyViewMode();
 
         await LoadCustomThemeAsync(db);
@@ -1620,6 +1636,110 @@ public partial class MainWindow : Window
         await SetSettingAsync(db, AppSettingKeys.CardScale, _cardScale.ToString(CultureInfo.InvariantCulture));
     }
 
+    private void ApplyUiFontScale(double scale)
+    {
+        _uiFontScale = Clamp(scale, MinUiFontScale, MaxUiFontScale);
+        Resources["AppBodyFontSize"] = 14 * _uiFontScale;
+        Resources["AppSmallFontSize"] = 11 * _uiFontScale;
+        Resources["AppLabelFontSize"] = 12 * _uiFontScale;
+        Resources["AppMutedFontSize"] = 13 * _uiFontScale;
+        Resources["AppLargeFontSize"] = 18 * _uiFontScale;
+        Resources["AppScreenTitleFontSize"] = 20 * _uiFontScale;
+        Resources["AppSectionTitleFontSize"] = 22 * _uiFontScale;
+        Resources["AppMenuButtonFontSize"] = 24 * _uiFontScale;
+        Resources["AppDetailTitleFontSize"] = 34 * _uiFontScale;
+        Resources["AppHeroFontSize"] = 68 * _uiFontScale;
+        SetUiFontScaleValueText(_uiFontScale);
+    }
+
+    private async void UiFontScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (UiFontScaleValueText is null)
+        {
+            return;
+        }
+
+        if (_deferUiFontScaleApply)
+        {
+            SetUiFontScaleValueText(e.NewValue);
+            return;
+        }
+
+        ApplyUiFontScale(e.NewValue);
+        if (_suppressUiFontScaleSave)
+        {
+            return;
+        }
+
+        await SaveUiFontScaleAsync();
+    }
+
+    private void UiFontScaleSlider_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _deferUiFontScaleApply = true;
+    }
+
+    private async void UiFontScaleSlider_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        await ApplyDeferredUiFontScaleAsync();
+    }
+
+    private async void UiFontScaleSlider_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        await ApplyDeferredUiFontScaleAsync();
+    }
+
+    private async Task ApplyDeferredUiFontScaleAsync()
+    {
+        if (!_deferUiFontScaleApply)
+        {
+            return;
+        }
+
+        _deferUiFontScaleApply = false;
+        ApplyUiFontScale(UiFontScaleSlider.Value);
+        if (!_suppressUiFontScaleSave)
+        {
+            await SaveUiFontScaleAsync();
+        }
+    }
+
+    private void DecreaseUiFontScaleButton_Click(object sender, RoutedEventArgs e)
+    {
+        AdjustUiFontScaleByPercent(-1);
+    }
+
+    private void IncreaseUiFontScaleButton_Click(object sender, RoutedEventArgs e)
+    {
+        AdjustUiFontScaleByPercent(1);
+    }
+
+    private void ResetUiFontScaleButton_Click(object sender, RoutedEventArgs e)
+    {
+        UiFontScaleSlider.Value = DefaultUiFontScale;
+    }
+
+    private void AdjustUiFontScaleByPercent(int percentDelta)
+    {
+        var currentPercent = (int)Math.Round(_uiFontScale * 100, MidpointRounding.AwayFromZero);
+        var nextScale = Clamp((currentPercent + percentDelta) / 100d, MinUiFontScale, MaxUiFontScale);
+        UiFontScaleSlider.Value = nextScale;
+    }
+
+    private async Task SaveUiFontScaleAsync()
+    {
+        await using var db = CreateDb();
+        await SetSettingAsync(db, AppSettingKeys.UiFontScale, _uiFontScale.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private void SetUiFontScaleValueText(double scale)
+    {
+        if (UiFontScaleValueText is not null)
+        {
+            UiFontScaleValueText.Text = $"{Math.Round(Clamp(scale, MinUiFontScale, MaxUiFontScale) * 100, MidpointRounding.AwayFromZero):0}%";
+        }
+    }
+
     private async void ThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || _updatingThemeControls || _transferService is null)
@@ -2996,6 +3116,9 @@ public partial class MainWindow : Window
     private const double MinCardScale = 0.75;
     private const double MaxCardScale = 4;
     private const double DefaultCardScale = 1.0;
+    private const double MinUiFontScale = 0.8;
+    private const double MaxUiFontScale = 3;
+    private const double DefaultUiFontScale = 1.0;
     private const double DefaultCoverAspectRatio = 3d / 4d;
     private const string CustomThemeKeyPrefix = "custom:";
     private const string RussianLanguage = "ru";
@@ -3179,6 +3302,8 @@ public partial class MainWindow : Window
         ["Light"] = "Светлая",
         ["Dark"] = "Тёмная",
         ["Language"] = "Язык",
+        ["Font size"] = "Размер шрифта",
+        ["Reset"] = "Сбросить",
         ["Back"] = "Назад",
         ["Home"] = "Домой",
         ["Start"] = "Старт",

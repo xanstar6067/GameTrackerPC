@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:models="clr-namespace:GameTrackerPC.Models"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         mc:Ignorable="d"
         Title="Reliquary"
         Height="840"
@@ -11,8 +12,20 @@
         MinHeight="680"
         MinWidth="760"
         Loaded="Window_Loaded"
-        Background="{DynamicResource AppBackgroundBrush}">
+        Background="{DynamicResource AppBackgroundBrush}"
+        FontSize="{DynamicResource AppBodyFontSize}">
     <Window.Resources>
+        <sys:Double x:Key="AppBodyFontSize">14</sys:Double>
+        <sys:Double x:Key="AppSmallFontSize">11</sys:Double>
+        <sys:Double x:Key="AppLabelFontSize">12</sys:Double>
+        <sys:Double x:Key="AppMutedFontSize">13</sys:Double>
+        <sys:Double x:Key="AppLargeFontSize">18</sys:Double>
+        <sys:Double x:Key="AppScreenTitleFontSize">20</sys:Double>
+        <sys:Double x:Key="AppSectionTitleFontSize">22</sys:Double>
+        <sys:Double x:Key="AppMenuButtonFontSize">24</sys:Double>
+        <sys:Double x:Key="AppDetailTitleFontSize">34</sys:Double>
+        <sys:Double x:Key="AppHeroFontSize">68</sys:Double>
+
         <SolidColorBrush x:Key="AppBackgroundBrush" Color="#08111F" />
         <SolidColorBrush x:Key="SurfaceBrush" Color="#101B2D" />
         <SolidColorBrush x:Key="SurfaceAltBrush" Color="#17243A" />
@@ -343,12 +356,12 @@
 
         <Style x:Key="MutedText" TargetType="{x:Type TextBlock}">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="{DynamicResource AppMutedFontSize}" />
         </Style>
 
         <Style x:Key="SectionTitle" TargetType="{x:Type TextBlock}">
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontSize" Value="{DynamicResource AppSectionTitleFontSize}" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, Segoe UI" />
             <Setter Property="Margin" Value="0,0,0,14" />
@@ -357,7 +370,7 @@
         <Style x:Key="LabelText" TargetType="{x:Type TextBlock}">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
             <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, Segoe UI" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="{DynamicResource AppLabelFontSize}" />
             <Setter Property="Margin" Value="0,0,0,2" />
         </Style>
 
@@ -618,7 +631,7 @@
                 <StackPanel>
                     <TextBlock x:Name="ScreenTitleText"
                                Text="GAMEVAULT"
-                               FontSize="20"
+                               FontSize="{DynamicResource AppScreenTitleFontSize}"
                                FontWeight="Bold"
                                FontFamily="Consolas, Cascadia Mono, Segoe UI" />
                     <TextBlock x:Name="ScreenSubtitleText"
@@ -639,12 +652,12 @@
                 <StackPanel VerticalAlignment="Center"
                             Margin="36,0,36,0">
                     <TextBlock Text="RELIQUARY"
-                               FontSize="68"
+                               FontSize="{DynamicResource AppHeroFontSize}"
                                FontWeight="Black"
                                FontFamily="Consolas, Cascadia Mono, Segoe UI"
                                Foreground="{DynamicResource PrimaryBrush}" />
                     <TextBlock Text="Desktop collection control"
-                               FontSize="18"
+                               FontSize="{DynamicResource AppLargeFontSize}"
                                Foreground="{DynamicResource MutedTextBrush}"
                                Margin="4,8,0,36" />
                     <StackPanel HorizontalAlignment="Left">
@@ -701,19 +714,19 @@
                              VerticalAlignment="Center">
                     <Button Content="New record"
                             Margin="12"
-                            FontSize="24"
+                            FontSize="{DynamicResource AppMenuButtonFontSize}"
                             Click="NewGameButton_Click" />
                     <Button Content="Database"
                             Margin="12"
-                            FontSize="24"
+                            FontSize="{DynamicResource AppMenuButtonFontSize}"
                             Click="OpenDatabaseButton_Click" />
                     <Button Content="Settings"
                             Margin="12"
-                            FontSize="24"
+                            FontSize="{DynamicResource AppMenuButtonFontSize}"
                             Click="OpenSettingsButton_Click" />
                     <Button Content="Exit"
                             Margin="12"
-                            FontSize="24"
+                            FontSize="{DynamicResource AppMenuButtonFontSize}"
                             Style="{StaticResource SecondaryButton}"
                             Click="ExitButton_Click" />
                 </UniformGrid>
@@ -855,7 +868,7 @@
                                        Grid.Row="3"
                                        HorizontalAlignment="Center"
                                        Margin="0,8,0,8"
-                                       FontSize="13"
+                                       FontSize="{DynamicResource AppMutedFontSize}"
                                        Foreground="{DynamicResource MutedTextBrush}" />
                             <Button Grid.Row="4"
                                     Content="-"
@@ -879,11 +892,11 @@
                              VerticalAlignment="Center">
                     <Button Content="Manual add"
                             Margin="12"
-                            FontSize="24"
+                            FontSize="{DynamicResource AppMenuButtonFontSize}"
                             Click="ManualAddButton_Click" />
                     <Button Content="Add by link"
                             Margin="12"
-                            FontSize="24"
+                            FontSize="{DynamicResource AppMenuButtonFontSize}"
                             Style="{StaticResource SecondaryButton}"
                             Click="AutoAddModeButton_Click" />
                 </UniformGrid>
@@ -929,7 +942,7 @@
                                     Padding="9,7"
                                     IsHitTestVisible="False">
                                 <TextBlock Text="Cover edit hint"
-                                           FontSize="12"
+                                           FontSize="{DynamicResource AppLabelFontSize}"
                                            FontWeight="SemiBold"
                                            TextWrapping="Wrap"
                                            Foreground="White">
@@ -1128,7 +1141,7 @@
                                                            RenderOptions.BitmapScalingMode="HighQuality"
                                                            Stretch="UniformToFill" />
                                                     <TextBlock Text="{Binding ArchiveName}"
-                                                               FontSize="11"
+                                                               FontSize="{DynamicResource AppSmallFontSize}"
                                                                Margin="0,6,0,0"
                                                                Foreground="{DynamicResource MutedTextBrush}"
                                                                TextWrapping="Wrap" />
@@ -1248,13 +1261,13 @@
                             <StackPanel>
                                 <TextBlock x:Name="DetailTitleText"
                                            Text="Game"
-                                           FontSize="34"
+                                           FontSize="{DynamicResource AppDetailTitleFontSize}"
                                            FontWeight="Black"
                                            FontFamily="Consolas, Cascadia Mono, Segoe UI"
                                            TextWrapping="Wrap" />
                                 <TextBlock x:Name="DetailSubtitleText"
                                            Style="{StaticResource MutedText}"
-                                           FontSize="16"
+                                           FontSize="{DynamicResource AppLargeFontSize}"
                                            Margin="0,8,0,16"
                                            TextWrapping="Wrap" />
                                 <WrapPanel>
@@ -1319,7 +1332,7 @@
                                                            RenderOptions.BitmapScalingMode="HighQuality"
                                                            Stretch="UniformToFill" />
                                                     <TextBlock Text="{Binding ArchiveName}"
-                                                               FontSize="11"
+                                                               FontSize="{DynamicResource AppSmallFontSize}"
                                                                Margin="0,6,0,0"
                                                                Foreground="{DynamicResource MutedTextBrush}"
                                                                TextWrapping="Wrap" />
@@ -1459,6 +1472,60 @@
                                       Width="260"
                                       HorizontalAlignment="Left"
                                       SelectionChanged="LanguageBox_SelectionChanged" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource CyberPanel}">
+                        <StackPanel>
+                            <TextBlock Text="Font size"
+                                       Style="{StaticResource SectionTitle}" />
+                            <Grid MaxWidth="520"
+                                  HorizontalAlignment="Left">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="-"
+                                        Width="42"
+                                        Height="36"
+                                        Margin="0,0,10,0"
+                                        Padding="0"
+                                        Click="DecreaseUiFontScaleButton_Click" />
+                                <Slider x:Name="UiFontScaleSlider"
+                                        Grid.Column="1"
+                                        MinWidth="260"
+                                        VerticalAlignment="Center"
+                                        Minimum="0.8"
+                                        Maximum="3"
+                                        Value="1"
+                                        TickFrequency="0.01"
+                                        SmallChange="0.01"
+                                        LargeChange="0.1"
+                                        IsSnapToTickEnabled="True"
+                                        ToolTip="Font size"
+                                        ValueChanged="UiFontScaleSlider_ValueChanged" />
+                                <Button Grid.Column="2"
+                                        Content="+"
+                                        Width="42"
+                                        Height="36"
+                                        Margin="10,0,0,0"
+                                        Padding="0"
+                                        Click="IncreaseUiFontScaleButton_Click" />
+                                <TextBlock x:Name="UiFontScaleValueText"
+                                           Grid.Column="3"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Right"
+                                           Margin="14,0,0,0"
+                                           Foreground="{DynamicResource MutedTextBrush}" />
+                                <Button Grid.Column="4"
+                                        Content="Reset"
+                                        Height="36"
+                                        Margin="10,0,0,0"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Click="ResetUiFontScaleButton_Click" />
+                            </Grid>
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource CyberPanel}">

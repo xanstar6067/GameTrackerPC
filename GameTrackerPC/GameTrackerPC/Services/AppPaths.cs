@@ -24,6 +24,7 @@ public static class AppSettingKeys
 {
     public const string ViewMode = "viewMode";
     public const string CardScale = "cardScale";
+    public const string UiFontScale = "uiFontScale";
     public const string Theme = "theme";
     public const string Language = "language";
     public const string BackupFolder = "backupFolder";
