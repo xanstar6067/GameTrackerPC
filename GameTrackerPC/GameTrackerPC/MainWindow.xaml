@@ -55,6 +55,7 @@
         <SolidColorBrush x:Key="InputBrush" Color="#0E1A2C" />
         <SolidColorBrush x:Key="InputTextBrush" Color="#F8FAFC" />
         <SolidColorBrush x:Key="ChipBrush" Color="#163D48" />
+        <SolidColorBrush x:Key="GameCardBrush" Color="#132034" />
         <SolidColorBrush x:Key="GameCardHoverBrush" Color="#162A3A" />
 
         <Style x:Key="CyberButton" TargetType="{x:Type Button}">
@@ -492,12 +493,11 @@
 
         <DataTemplate x:Key="GameCardTemplate" DataType="{x:Type models:GameListItem}">
             <Border x:Name="CardChrome"
-                    BorderBrush="{DynamicResource BorderBrushSoft}"
-                    BorderThickness="1"
+                    BorderThickness="0"
                     Height="{DynamicResource GameCardHeight}"
                     Padding="{DynamicResource GameCardPadding}"
                     Margin="{DynamicResource GameCardMargin}"
-                    Background="{DynamicResource SurfaceBrush}">
+                    Background="{DynamicResource GameCardBrush}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -511,9 +511,6 @@
                         <Image Source="{Binding CoverPreview}"
                                RenderOptions.BitmapScalingMode="HighQuality"
                                Stretch="Fill" />
-                        <Border BorderBrush="{DynamicResource BorderBrushSoft}"
-                                BorderThickness="1"
-                                IsHitTestVisible="False" />
                     </Grid>
                     <StackPanel Grid.Column="1"
                                 Margin="{DynamicResource GameCardContentMargin}">
